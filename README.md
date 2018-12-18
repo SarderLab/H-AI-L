@@ -8,7 +8,7 @@ This is currently limited to files formats which have openslide-python support (
 
 NOTE: currently the only supported ImageScope  annotation tools are the freehand select, and rectangle tools.
 
-Created by [Brendon Lutnick](brendonl@buffalo.edu) and [Brandon Ginley](bgginley@buffalo.edu) at SUNY Buffalo.
+Created by [Brendon Lutnick](https://github.com/brendonlutnick) and [Brandon Ginley](https://github.com/bgginley) at SUNY Buffalo.
 
 This code runs using both python2 and python3, and was tested using ubuntu 16.04
 
