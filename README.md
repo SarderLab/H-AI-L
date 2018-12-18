@@ -27,6 +27,10 @@ This code runs using both python2 and python3, and was tested using ubuntu 16.04
   - joblib            (https://pythonhosted.org/joblib/)
   - TkInter           (https://wiki.python.org/moin/TkInter)
   - PIL               (https://pillow.readthedocs.io/en/latest/)
+  
+  Before starting a new project, you must download a pretrained checkpoint file containing model parameters
+  - available here: https://buffalo.box.com/s/ks7m9lf5h4ilzwyqdnlr9h8xdvd13a5i
+  Place this file in the [H-AI-L/Codes/Deeplab_network] folder
 
 ### Usage:
 
