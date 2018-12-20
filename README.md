@@ -6,6 +6,8 @@ Currently this code supports annotation and viewing of WSI boundaries using Aper
 (https://www.leicabiosystems.com/digital-pathology/manage/aperio-imagescope/). 
 This is currently limited to files formats which have openslide-python support (.tif support is provided via PIL).
 
+A preprint version of this work can be found here: https://arxiv.org/abs/1812.07509
+
 NOTE: currently the only supported ImageScope  annotation tools are the freehand select, and rectangle tools.
 
 Created by [Brendon Lutnick](https://github.com/brendonlutnick) and [Brandon Ginley](https://github.com/bgginley) at SUNY Buffalo.
