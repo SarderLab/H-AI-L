@@ -12,7 +12,7 @@ NOTE: currently the only supported ImageScope  annotation tools are the freehand
 
 Created by [Brendon Lutnick](https://github.com/brendonlutnick) and [Brandon Ginley](https://github.com/bgginley) at SUNY Buffalo.
 
-This code runs using both python2 and python3, and was tested using ubuntu 16.04
+This code runs using python3, and was tested using ubuntu 16.04
 
 ### Dependencies (we think we got them all):
 
