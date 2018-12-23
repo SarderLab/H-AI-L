@@ -16,19 +16,19 @@ This code runs using python3, and was tested using ubuntu 16.04
 
 ### Dependencies (we think we got them all):
 
-  - Tensorflow        (https://www.tensorflow.org/)
-  - OpenSlide Python  (https://openslide.org/)
-  - openslide-tools   (https://openslide.org/)
-  - OpenCV Python     (http://opencv-python-tutroals.readthedocs.io/en/latest/index.html)
-  - NumPy             (http://www.numpy.org/)
-  - imgaug            (https://github.com/aleju/imgaug)
-  - lxml              (https://lxml.de/)
-  - skimage           (http://scikit-image.org/docs/dev/api/skimage.html)
-  - matplotlib        (https://matplotlib.org/)
-  - imageio           (https://pypi.org/project/imageio/)
-  - joblib            (https://pythonhosted.org/joblib/)
-  - TkInter           (https://wiki.python.org/moin/TkInter)
-  - PIL               (https://pillow.readthedocs.io/en/latest/)
+  - Tensorflow (1.7.0)           (https://www.tensorflow.org/)
+  - OpenSlide Python (1.1.1)     (https://openslide.org/)
+  - openslide-tools              (https://openslide.org/)
+  - OpenCV Python (3.4.0.12)     (http://opencv-python-tutroals.readthedocs.io/en/latest/index.html)
+  - NumPy (1.14.2)               (http://www.numpy.org/)
+  - imgaug (0.2.5)               (https://github.com/aleju/imgaug)
+  - lxml (3.5.0)                 (https://lxml.de/)
+  - skimage (0.15.0)             (http://scikit-image.org/docs/dev/api/skimage.html)
+  - matplotlib (2.2.2)           (https://matplotlib.org/)
+  - imageio (2.3.0)              (https://pypi.org/project/imageio/)
+  - joblib (0.11)                (https://pythonhosted.org/joblib/)
+  - TkInter (3.7.2)              (https://wiki.python.org/moin/TkInter)
+  - PIL (5.3.0)                  (https://pillow.readthedocs.io/en/latest/)
   
   Before starting a new project, you must download a pretrained checkpoint file containing model parameters
   - available here: https://buffalo.box.com/s/ks7m9lf5h4ilzwyqdnlr9h8xdvd13a5i
