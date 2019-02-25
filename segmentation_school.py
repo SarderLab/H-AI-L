@@ -8,7 +8,7 @@ sys.path.append(os.getcwd()+'/Codes')
 
 
 """
-main code for training semantic segmentaiton of WSI iterativly
+main code for training semantic segmentation of WSI iteratively
 
     --option              -   code options
         [new]             -   set up a new project
@@ -70,10 +70,10 @@ def main(args):
 def savetime(args, starttime):
     if args.option in ['new', 'New']:
         with open(args.base_dir + '/' + args.project + '/runtime.txt', 'w') as timefile:
-            timefile.write('option' +'\t'+ 'time' +'\t'+ 'epochs' +'\t'+ 'aug_LR' +'\t'+ 'aug_HR' +'\t'+ 'overlap_percentLR' +'\t'+ 'overlap_percentHR')
+            timefile.write('option' +'\t'+ 'time' +'\t'+ 'epochs_LR' +'\t'+ 'epochs_HR' +'\t'+ 'aug_LR' +'\t'+ 'aug_HR' +'\t'+ 'overlap_percentLR' +'\t'+ 'overlap_percentHR')
     if args.option in ['train', 'Train']:
         with open(args.base_dir + '/' + args.project + '/runtime.txt', 'a') as timefile:
-            timefile.write('\n' + args.option +'\t'+ str(time.time()-starttime) +'\t'+ str(args.epoch) +'\t'+ str(args.aug_LR) +'\t'+ str(args.aug_HR) +'\t'+ str(args.overlap_percentLR) +'\t'+ str(args.overlap_percentHR))
+            timefile.write('\n' + args.option +'\t'+ str(time.time()-starttime) +'\t'+ str(args.epoch_LR) +'\t'+ str(args.epoch_HR) +'\t'+ str(args.aug_LR) +'\t'+ str(args.aug_HR) +'\t'+ str(args.overlap_percentLR) +'\t'+ str(args.overlap_percentHR))
     if args.option in ['predict', 'Predict']:
         with open(args.base_dir + '/' + args.project + '/runtime.txt', 'a') as timefile:
             timefile.write('\n' + args.option +'\t'+ str(time.time()-starttime))
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     parser.add_argument('--prune_LR', dest='prune_LR', default=0.0 ,type=float,
         help='percent of low rez data to be randomly removed [0-1]-->[none-all]')
     parser.add_argument('--classNum', dest='classNum', default=0 ,type=int,
-        help='number of classes present in the training data')
+        help='number of classes present in the training data plus one (one class is specified for background)')
     parser.add_argument('--classNum_HR', dest='classNum_HR', default=0 ,type=int,
         help='number of classes present in the High res training data [USE ONLY IF DIFFERENT FROM LOW RES]')
 
@@ -155,8 +155,10 @@ if __name__ == '__main__':
     parser.add_argument('--CNNbatch_sizeHR', dest='CNNbatch_sizeHR', default=3 ,type=int,
         help='Size of batches for training high resolution CNN')
     #Hyperparameters
-    parser.add_argument('--epoch', dest='epoch', default=1 ,type=int,
-        help='training epochs')
+    parser.add_argument('--epoch_LR', dest='epoch_LR', default=1 ,type=int,
+        help='training epochs for low resolution network')
+    parser.add_argument('--epoch_HR', dest='epoch_HR', default=1 ,type=int,
+        help='training epochs for high resolution network')
     parser.add_argument('--saveIntervals', dest='saveIntervals', default=10 ,type=int,
         help='how many checkpoints get saved durring training')
     parser.add_argument('--learning_rate_HR', dest='learning_rate_HR', default=2.5e-4,
@@ -179,9 +181,12 @@ if __name__ == '__main__':
         help='file ext of wsi images')
     parser.add_argument('--bg_intensity', dest='bg_intensity', default=.5 ,type=float,
         help='if displaying output classifications [save_outputs = True] background color [0-1]')
+    parser.add_argument('--approximation_downsample', dest='approx_downsample', default=1 ,type=float,
+        help='Amount to downsample high resolution prediction boundaries for smoothing')
+
 
     ### Params for optimizing wsi mask cleanup ###
-    parser.add_argument('--min_size', dest='min_size', default=625 ,type=int,
+    parser.add_argument('--min_size', dest='min_size', default=15000 ,type=int,
         help='min size region to be considered after prepass [in pixels]')
     parser.add_argument('--LR_region_pad', dest='LR_region_pad', default=50 ,type=int,
         help='padded region for low resolution region extraction')
