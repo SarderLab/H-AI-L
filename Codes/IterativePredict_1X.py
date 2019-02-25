@@ -125,7 +125,12 @@ def predict(args):
             + str(iteration) + '/*' + args.wsi_ext)
 
         for wsi in WSIs:
-            predict_xml(args=args, dirs=dirs, wsi=wsi, iteration=iteration)
+            try:
+                predict_xml(args=args, dirs=dirs, wsi=wsi, iteration=iteration)
+            except KeyboardInterrupt:
+                break
+            except:
+                print('!!! Prediction on ' + wsi + ' failed\nmoving on...')
         print('\n\n\033[92;5mPlease correct the xml annotations found in: \n\t' + dirs['xml_save_dir'])
         print('\nthen place them in: \n\t'+ args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration) + '/')
         print('\nand run [--option train]\033[0m\n')
@@ -386,9 +391,13 @@ def un_suey(dirs, args): # reconstruct wsi from predicted masks
         yStop = np.uint32(region[4])
         #print('yStop: ' + str(yStop))
 
+        mask_part = wsiMask[yStart:yStop, xStart:xStop]
+        ylen, xlen = np.shape(mask_part)
+        mask = mask[:ylen, :xlen]
+
         # populate wsiMask with max
         #print(np.shape(wsiMask))
-        wsiMask[yStart:yStop, xStart:xStop] = np.maximum(wsiMask[yStart:yStop, xStart:xStop], mask).astype(np.uint8)
+        wsiMask[yStart:yStop, xStart:xStop] = np.maximum(mask_part, mask).astype(np.uint8)
         #wsiMask[yStart:yStop, xStart:xStop] = np.ones([yStop-yStart, xStop-xStart])
 
     return wsiMask
@@ -426,7 +435,7 @@ def get_contour_points(mask, args, downsample, offset={'X': 0,'Y': 0}):
     for j in range(np.shape(maskPoints)[0]):
         if cv2.contourArea(maskPoints[j]) > args.min_size:
             pointList = []
-            for i in range(np.shape(maskPoints[j])[0]):
+            for i in range(0,np.shape(maskPoints[j])[0],4):
                 point = {'X': (maskPoints[j][i][0][0] * downsample) + offset['X'], 'Y': (maskPoints[j][i][0][1] * downsample) + offset['Y']}
                 pointList.append(point)
             pointsList.append(pointList)

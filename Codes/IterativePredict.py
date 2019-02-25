@@ -23,7 +23,7 @@ from shutil import rmtree
 from IterativeTraining import get_num_classes
 from get_choppable_regions import get_choppable_regions
 from get_network_performance import get_perf
-
+from matplotlib import pyplot as plt
 """
 Pipeline code to find gloms from WSI
 
@@ -56,7 +56,6 @@ def validate(args):
     # get all WSIs
     WSIs = glob(args.base_dir + '/' + args.project + dirs['validation_data_dir']
     + '/*' + args.wsi_ext)
-
     if iteration == 'none':
         print('ERROR: no trained models found \n\tplease use [--option train]')
 
@@ -126,9 +125,13 @@ def predict(args):
         # get all WSIs
         WSIs = glob(args.base_dir + '/' + args.project + dirs['training_data_dir']
             + str(iteration) + '/*' + args.wsi_ext)
-
         for wsi in WSIs:
-            predict_xml(args=args, dirs=dirs, wsi=wsi, iteration=iteration)
+            try:
+                predict_xml(args=args, dirs=dirs, wsi=wsi, iteration=iteration)
+            except KeyboardInterrupt:
+                break
+            except:
+                print('!!! Prediction on ' + wsi + ' failed\nmoving on...')
         print('\n\n\033[92;5mPlease correct the xml annotations found in: \n\t' + dirs['xml_save_dir'])
         print('\nthen place them in: \n\t'+ args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration) + '/')
         print('\nand run [--option train]\033[0m\n')
@@ -147,6 +150,8 @@ def predict_xml(args, dirs, wsi, iteration):
         classes = []
         for xml in annotatedXMLs:
             classes.append(get_num_classes(xml))
+        print(classes)
+        print(args.classNum)
         classNum_LR = max(classes)
         classNum_HR = max(classes)
     else:
@@ -192,7 +197,7 @@ def predict_xml(args, dirs, wsi, iteration):
         print('saving to: ' + dirs['outDir'] + fileID + dirs['mask_dir'] + fileID  + '.png')
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            imsave(dirs['outDir'] + fileID + dirs['mask_dir'] + fileID + '.png', wsiMask)
+            imsave(dirs['outDir'] + fileID + dirs['mask_dir'] + fileID + '.png', wsiMask/np.max(wsiMask))
 
     # find glom locations in reconstructed map
     print('\ninterpreting prediction map ...')
@@ -220,13 +225,27 @@ def predict_xml(args, dirs, wsi, iteration):
         '--gpu', str(args.gpu)])
 
     print('\nsaving final glom images ...')
-    print('\nworking on:')
+    print('\nstitching high resolution WSI mask:')
 
-    crop_suey(label_offsets, dirs, args, classNum_HR, downsample_HR)
+    wsiMask_HR=unstitch_HR(dirs=dirs,args=args,wsi=wsi)
+    wsidims=wsiMask_HR.shape
+    d1=int(wsidims[0]*(1/args.approx_downsample))
+    d2=int(wsidims[1]*(1/args.approx_downsample))
+
+    if args.approx_downsample!=1:
+        print('\nDownsampling high resolution mask for prediction smoothing...')
+        wsiMask_HR=resize(wsiMask_HR,(d1,d2),order=0,anti_aliasing=False,preserve_range=True)
+    #mask_display=resize(wsiMask_HR,(d1,d2))
+    #plt.imshow(mask_display/np.max(wsiMask))
+    #plt.show()
+    print('\nGenerating XML annotations from WSI mask...')
+    make_folder(dirs['outDir'] + dirs['fileID'] + dirs['final_output_dir'] + dirs['final_boundary_image_dir'])
+    crop_suey(wsiMask_HR,label_offsets, dirs, args, classNum_HR, downsample_HR)
+
 
     # clean up
     if dirs['save_outputs'] == False:
-        print('cleaning up')
+        print('\ncleaning up')
         rmtree(dirs['outDir']+fileID)
 
 
@@ -367,7 +386,52 @@ def chop_wsi(yStart, xStart, idxx, idxy, f_name, f2_name, dirs, downsample, regi
         sys.stdout.flush()
         restart_line()
 
-def un_suey(dirs, args): # reconstruct wsi from predicted masks
+def unstitch_HR(dirs,args,wsi):# reconstruct wsi from predicted masks, high resolution
+    image_coordinate_file=dirs['outDir'] + dirs['fileID'] + dirs['txt_save_dir'] + dirs['fileID'] + '_crops.txt'
+    slide=getWsi(wsi)
+    dim_x, dim_y=slide.dimensions
+    wsiMask=np.zeros([dim_y,dim_x])
+    f = open(image_coordinate_file, 'r')
+    lines = f.readlines()
+    f.close()
+    lines = np.array(lines)
+
+    for regionNum in range(0, np.size(lines)):
+
+        sys.stdout.write('   <'+str(regionNum)+'/'+ str(np.size(lines)-1)+ '>   ')
+        sys.stdout.flush()
+        restart_line()
+        # get region
+        uniqueImageID=lines[regionNum].split('/')[-1]
+        maskID=uniqueImageID.split('.')[0]
+        region = maskID.split('_')[-4:]
+        # read mask
+        mask = imread(dirs['outDir'] + dirs['fileID'] + dirs['final_output_dir'] + 'prediction/'+ maskID + '_mask.png')
+
+        # get region bounds
+        xStart = np.int32(region[2])
+        #print('xStart: ' + str(xStart))
+        xStop = np.int32(region[3])
+        #print('xStop: ' + str(xStop))
+        yStart = np.int32(region[0])
+        if yStart < 0:
+            yStart = 0
+        #print('yStart: ' + str(yStart))
+        yStop = np.int32(region[1])
+        #print('yStop: ' + str(yStop))
+
+        mask_part = wsiMask[yStart:yStop, xStart:xStop]
+        ylen, xlen = np.shape(mask_part)
+        mask = mask[:ylen, :xlen]
+
+        # populate wsiMask with max
+        #print(np.shape(wsiMask))
+        wsiMask[yStart:yStop, xStart:xStop] = np.maximum(mask_part, mask)
+        #wsiMask[yStart:yStop, xStart:xStop] = np.ones([yStop-yStart, xStop-xStart])
+
+    return wsiMask
+
+def un_suey(dirs, args): # reconstruct wsi from predicted masks, low resolution
     txtFile = dirs['fileID'] + '.txt'
 
     # read txt file
@@ -416,7 +480,7 @@ def un_suey(dirs, args): # reconstruct wsi from predicted masks
 def find_suey(wsiMask, dirs, downsample, args, wsi): # locates the detected glom regions in the reconstructed wsi mask
     # clean up mask
     print('   removing small objects')
-    cleanMask = remove_small_objects(wsiMask.astype(bool), args.min_size)
+    cleanMask = remove_small_objects(wsiMask.astype(bool), (args.min_size)/(downsample*downsample))
     print('   separating Glom objects\n')
     # find all unconnected regions
     labeledArray, num_features = label(cleanMask)
@@ -429,7 +493,6 @@ def find_suey(wsiMask, dirs, downsample, args, wsi): # locates the detected glom
             imsave(dirs['outDir'] + dirs['fileID'] + dirs['mask_dir'] + dirs['fileID'] + '_cleaned.png', cleanMask*255)
 
     make_folder(dirs['outDir'] + dirs['fileID'] + dirs['img_save_dir'] + dirs['crop_dir'])
-
     f_name = dirs['outDir'] + dirs['fileID'] + dirs['txt_save_dir'] + dirs['fileID'] + '_crops.txt'
     f = open(f_name, 'w')
     f.close()
@@ -440,60 +503,133 @@ def find_suey(wsiMask, dirs, downsample, args, wsi): # locates the detected glom
     #Parallel(n_jobs=num_cores)(delayed(crop_region)(region_iter=i, labeledArray=labeledArray, fileID=fileID, f_name=f_name) for i in range(1, num_features))
     label_offsets = []
     for region_iter in range(1, num_features):
-        label_offset = crop_region(region_iter=region_iter, labeledArray=labeledArray, f_name=f_name, dirs=dirs, downsample=downsample, args=args, wsi=wsi)
-        label_offsets.append(label_offset)
+        label_offsets = crop_region(region_iter=region_iter, labeledArray=labeledArray, f_name=f_name, dirs=dirs, downsample=downsample, args=args, wsi=wsi,label_offsets=label_offsets)
+        #label_offsets.append(label_offset[:])
 
     test_num_steps = file_len(dirs['outDir'] + dirs['fileID'] + dirs['txt_save_dir'] + dirs['fileID'] + '_crops' + ".txt")
     return test_num_steps, labeledArray, label_offsets
 
-def crop_region(region_iter, labeledArray, f_name, dirs, downsample, args, wsi): # crop selected region from wsi and save // location defined by labeledArray
+def crop_region(region_iter, labeledArray, f_name, dirs, downsample, args, wsi,label_offsets): # crop selected region from wsi and save // location defined by labeledArray
     slide = getWsi(wsi)
+    slide_size = slide.dimensions
 
     # get list of locations for pixels == region_iter
     mask_region = np.argwhere(labeledArray == region_iter)
     # calculate the region bounds
-    yStart = (min(mask_region[:,0]) * downsample) - args.LR_region_pad
-    yLen = (max(mask_region[:,0]) * downsample) - yStart + args.LR_region_pad
-    xStart = (min(mask_region[:,1]) * downsample) - args.LR_region_pad
-    xLen = (max(mask_region[:,1]) * downsample) - xStart + args.LR_region_pad
+    yStart = max(0, (min(mask_region[:,0]) * downsample) - args.LR_region_pad)
+    yLen = min((max(mask_region[:,0]) * downsample) - yStart + args.LR_region_pad, slide_size[1]*downsample - yStart)
+    xStart = max(0, (min(mask_region[:,1]) * downsample) - args.LR_region_pad)
+    xLen = min((max(mask_region[:,1]) * downsample) - xStart + args.LR_region_pad, slide_size[0]*downsample - yStart)
 
     region = np.array(slide.read_region((xStart,yStart),0,(xLen,yLen)))
     region = region[:,:,0:3]
 
-    # print output
-    sys.stdout.write('   <' + str(region_iter) + '>   ')
-    sys.stdout.flush()
-    restart_line()
+    dims=region.shape
+    max_block_dim=2000
+    sub_box_size=args.boxSizeHR
+    sub_region_iter=0
+    if (xLen*yLen)>(max_block_dim*max_block_dim):
+        stepHR = int(sub_box_size*(1-args.overlap_percentHR))
+        Idx1=range(xStart,xStart+xLen+sub_box_size,stepHR)-xStart
+        Idx2=range(yStart,yStart+yLen+sub_box_size,stepHR)-yStart
+        Idx1_o=range(xStart,xStart+xLen+sub_box_size,stepHR)
+        Idx2_o=range(yStart,yStart+yLen+sub_box_size,stepHR)
 
-    # write image path to text file
-    f = open(f_name, 'a+')
-    f.write(dirs['crop_dir'] + dirs['fileID'] + str(region_iter) + args.imBoxExt + '\n')
-    f.close()
+        Ovl1=xLen-Idx1[-2]
+        Ovl2=yLen-Idx2[-2]
+        Idx1[-1]=xLen
+        Idx2[-1]=yLen
+        Idx1_o[-1]=xStart+xLen
+        Idx2_o[-1]=yStart+yLen
 
-    # save image region
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        imsave(dirs['outDir'] + dirs['fileID'] + dirs['img_save_dir'] + dirs['crop_dir'] + dirs['fileID'] + str(region_iter) + args.imBoxExt, region)
-    label_offset = {'Y': yStart, 'X': xStart}
-    return label_offset
+        for index1,ii in enumerate(Idx1):
+            for index2,jj in enumerate(Idx2):
+                sys.stdout.write('   <' + str(region_iter)+'_' +str(sub_region_iter) + '>   ')
+                sys.stdout.flush()
+                restart_line()
+                if ii==Idx1[-1]:
+                    continue
+                if jj==Idx2[-1]:
+                    continue
+                if ii>xLen:
+                    continue
+                if jj>yLen:
+                    continue
+
+                if (ii+sub_box_size)>xLen:
+                    IdxEndx=xLen
+                else:
+                    IdxEndx=ii+sub_box_size
+
+                if (jj+sub_box_size)>yLen:
+                    IdxEndy=yLen
+                else:
+                    IdxEndy=jj+sub_box_size
+
+                im_name=dirs['fileID']+'_'+str(Idx2_o[index2])+'_'+str(IdxEndy+yStart)+'_'+str(Idx1_o[index1])+'_'+str(IdxEndx+xStart)+args.imBoxExt
+                sub_block=region[jj:IdxEndy,ii:IdxEndx,:]
+                sub_region_iter=sub_region_iter+1
+
+                f = open(f_name, 'a+')
+                f.write(dirs['crop_dir'] + im_name+ '\n')
+                f.close()
+
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    imsave(dirs['outDir'] + dirs['fileID'] + dirs['img_save_dir'] + dirs['crop_dir'] + im_name, sub_block)
+
+                label_offsets.append({'Y':Idx2_o[index2],'X': Idx1_o[index1]})
+    else:
+        sub_region_iter=0
+        # print output
+        sys.stdout.write('   <' + str(region_iter)+'_' +str(sub_region_iter) + '>   ')
+        sys.stdout.flush()
+        restart_line()
+        im_name=dirs['fileID']+'_'+str(yStart)+'_'+str(yStart+yLen)+'_'+str(xStart)+'_'+str(xStart+xLen)+args.imBoxExt
+        # write image path to text file
+        f = open(f_name, 'a+')
+        f.write(dirs['crop_dir'] + im_name + '\n')
+        f.close()
 
 
-def crop_suey(label_offsets, dirs, args, classNum, downsample):
-    txtFile = dirs['fileID'] + '_crops.txt'
+        # save image region
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            imsave(dirs['outDir'] + dirs['fileID'] + dirs['img_save_dir'] + dirs['crop_dir'] + im_name, region)
+        label_offsets.append({'Y': yStart, 'X': xStart})
+    return label_offsets
 
-    # read txt file with img paths
-    f = open(dirs['outDir'] + dirs['fileID'] + dirs['txt_save_dir'] + txtFile, 'r')
-    lines = f.readlines()
-    f.close()
-    lines = np.array(lines)
 
-    make_folder(dirs['outDir'] + dirs['fileID'] + dirs['final_output_dir'] + dirs['final_boundary_image_dir'][1:])
-
+def crop_suey(wsiMask,label_offsets, dirs, args, classNum, downsample):
     # make xml
     Annotations = xml_create()
     # add annotation
     for i in range(classNum)[1:]: # exclude background class
         Annotations = xml_add_annotation(Annotations=Annotations, annotationID=i)
+
+
+    for classregion in range(1,classNum):
+        binaryMask = np.zeros(np.shape(wsiMask)).astype('uint8')
+        binaryMask[wsiMask == classregion] = 1
+        pointsList = get_contour_points(binaryMask, args=args, downsample=downsample)
+
+        for i in range(np.shape(pointsList)[0]):
+            pointList = pointsList[i]
+
+            Annotations = xml_add_region(Annotations=Annotations, pointList=pointList,args=args, annotationID=classregion)
+
+    #txtFile = dirs['fileID'] + '_crops.txt'
+
+
+    #make_folder(dirs['outDir'] + dirs['fileID'] + dirs['final_output_dir'] + dirs['final_boundary_image_dir'][1:])
+    txtFile = dirs['fileID'] + '_crops.txt'
+
+    # read txt file with img paths
+    lines=[]
+    f = open(dirs['outDir'] + dirs['fileID'] + dirs['txt_save_dir'] + txtFile, 'r')
+    lines = f.readlines()
+    f.close()
+    lines = np.array(lines)
 
     for line in range(0, np.size(lines)):
         image_path = lines[line].split('\n')[0]
@@ -502,24 +638,6 @@ def crop_suey(label_offsets, dirs, args, classNum, downsample):
         file_name = (image_path.split('.')[0]).split(dirs['crop_dir'])[1]
         mask_image = imread(dirs['outDir'] + dirs['fileID'] + dirs['final_output_dir'] + 'prediction/'
             + file_name + '_mask.png')
-
-        # print output
-        sys.stdout.write('   <' + file_name + '>   ')
-        sys.stdout.flush()
-        restart_line()
-
-        for value in np.unique(mask_image)[1:]:
-            # get only 1 class binary mask
-            binary_mask = np.zeros(np.shape(mask_image)).astype('uint8')
-            binary_mask[mask_image == value] = 1
-
-            # add mask to xml
-            label_offset = label_offsets[line]
-            pointsList = get_contour_points(binary_mask, args=args, downsample=downsample, offset=label_offset)
-            for i in range(np.shape(pointsList)[0]):
-                pointList = pointsList[i]
-                Annotations = xml_add_region(Annotations=Annotations, pointList=pointList, annotationID=value)
-
         # save mask images
         if dirs['save_outputs'] == True:
             glom_image = imread(dirs['outDir'] + dirs['fileID'] + dirs['img_save_dir'] + image_path[1:])
@@ -531,7 +649,7 @@ def crop_suey(label_offsets, dirs, args, classNum, downsample):
                     # save resulting image
                     with warnings.catch_warnings():
                         warnings.simplefilter("ignore")
-                        imsave(dirs['outDir'] + dirs['fileID'] + dirs['final_output_dir'] + dirs['final_boundary_image_dir'][1:] + file_name + '_glom' + args.finalImgExt, glom_image)
+                        imsave(dirs['outDir'] + dirs['fileID'] + dirs['final_output_dir'] + dirs['final_boundary_image_dir'][1:] + file_name + args.finalImgExt, glom_image)
 
     # save xml
     xml_save(Annotations=Annotations, filename=dirs['xml_save_dir']+'/'+dirs['fileID']+'.xml')
@@ -540,12 +658,12 @@ def get_contour_points(mask, args, downsample, offset={'X': 0,'Y': 0}):
     # returns a dict pointList with point 'X' and 'Y' values
     # input greyscale binary image
     _, maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
-    pointsList = []
 
+    pointsList = []
     for j in range(np.shape(maskPoints)[0]):
-        if cv2.contourArea(maskPoints[j]) > args.min_size:
+        if cv2.contourArea(maskPoints[j]) > ((args.min_size)/(downsample*downsample*args.approx_downsample)):
             pointList = []
-            for i in range(np.shape(maskPoints[j])[0]):
+            for i in range(0,np.shape(maskPoints[j])[0]):
                 point = {'X': (maskPoints[j][i][0][0] * downsample) + offset['X'], 'Y': (maskPoints[j][i][0][1] * downsample) + offset['Y']}
                 pointList.append(point)
             pointsList.append(pointList)
@@ -566,7 +684,7 @@ def xml_add_annotation(Annotations, annotationID=None): # add new annotation
     Regions = ET.SubElement(Annotation, 'Regions')
     return Annotations
 
-def xml_add_region(Annotations, pointList, annotationID=-1, regionID=None): # add new region to annotation
+def xml_add_region(Annotations, pointList,args, annotationID=-1, regionID=None): # add new region to annotation
     # add new Region to Annotation
     # defualts to last annotationID and new regionID
     Annotation = Annotations.find("Annotation[@Id='" + str(annotationID) + "']")
@@ -576,9 +694,9 @@ def xml_add_region(Annotations, pointList, annotationID=-1, regionID=None): # ad
     Region = ET.SubElement(Regions, 'Region', attrib={'NegativeROA': '0', 'ImageFocus': '-1', 'DisplayId': '1', 'InputRegionId': '0', 'Analyze': '0', 'Type': '0', 'Id': str(regionID)})
     Vertices = ET.SubElement(Region, 'Vertices')
     for point in pointList: # add new Vertex
-        ET.SubElement(Vertices, 'Vertex', attrib={'X': str(point['X']), 'Y': str(point['Y']), 'Z': '0'})
+        ET.SubElement(Vertices, 'Vertex', attrib={'X': str(point['X']*args.approx_downsample), 'Y': str(point['Y']*args.approx_downsample), 'Z': '0'})
     # add connecting point
-    ET.SubElement(Vertices, 'Vertex', attrib={'X': str(pointList[0]['X']), 'Y': str(pointList[0]['Y']), 'Z': '0'})
+    ET.SubElement(Vertices, 'Vertex', attrib={'X': str(pointList[0]['X']*args.approx_downsample), 'Y': str(pointList[0]['Y']*args.approx_downsample), 'Z': '0'})
     return Annotations
 
 def xml_save(Annotations, filename):

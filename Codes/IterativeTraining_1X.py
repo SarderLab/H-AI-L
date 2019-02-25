@@ -279,7 +279,7 @@ def IterateTraining(args):
     generateDatalists(dirs['outDirAIHR'],dirs['outDirAMHR'],'/regions/','/masks/',dirs['imExt'],dirs['maskExt'],trainOutHR)
     numImagesHR=len(glob(dirs['outDirAIHR'] + '*' + dirs['imExt']))
 
-    numStepsHR=(args.epoch*numImagesHR)/ args.CNNbatch_sizeHR
+    numStepsHR=(args.epoch_HR*numImagesHR)/ args.CNNbatch_sizeHR
     # assign to dict
     training_args_HR={
         'numImages': numImagesHR,
@@ -292,7 +292,7 @@ def IterateTraining(args):
         'input_width': args.boxSizeHR,
         'modeldir': modeldir_HR,
         'num_classes': classNum,
-        'gpu': 0,
+        'gpu': args.gpu,
         'data_dir': dirs['data_dir_HR'],
         'print_color': "\033[1;32;40m",
         'log_file': modeldir_HR + 'log_'+ str(currentAnnotationIteration+1) +'_HR.txt',
