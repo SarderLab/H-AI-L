@@ -177,7 +177,7 @@ if __name__ == '__main__':
         help='ext of saved image blocks')
     parser.add_argument('--finalImgExt', dest='finalImgExt', default='.jpeg' ,type=str,
         help='ext of final saved images')
-    parser.add_argument('--wsi_ext', dest='wsi_ext', default='.svs' ,type=str,
+    parser.add_argument('--wsi_ext', dest='wsi_ext', default='.svs' , nargs='+', type=str,
         help='file ext of wsi images')
     parser.add_argument('--bg_intensity', dest='bg_intensity', default=.5 ,type=float,
         help='if displaying output classifications [save_outputs = True] background color [0-1]')
