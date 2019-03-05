@@ -103,15 +103,17 @@ def IterateTraining(args):
             #Get unique name of WSI
             fileID=xmlID.split('/')[-1].split('.xml')[0]
 
-            wsiID=dirs['basedir'] + dirs['project']+  dirs['training_data_dir'] + str(currentAnnotationIteration) +'/'+ fileID + args.wsi_ext
+            #create memory addresses for wsi files
+            for ext in args.wsi_ext:
+                wsiID=dirs['basedir'] + dirs['project']+  dirs['training_data_dir'] + str(currentAnnotationIteration) +'/'+ fileID + ext
 
-            #Ensure annotations exist
-            if os.path.isfile(wsiID)==False:
-                print('\nError - missing wsi file: ' + wsiID + '. Please provide.\n')
+                #Ensure annotations exist
+                if os.path.isfile(wsiID)==True:
+                    break
 
 
             #Load openslide information about WSI
-            if args.wsi_ext != '.tif':
+            if ext != '.tif':
                 slide=getWsi(wsiID)
                 #WSI level 0 dimensions (largest size)
                 dim_x,dim_y=slide.dimensions
@@ -428,7 +430,7 @@ def return_region(args, xmlID, wsiID, fileID, yStart, xStart, idxy, idxx, downsa
 
     if chop_regions[idxy,idxx] != 0:
         uniqID=fileID + str(yStart) + str(xStart)
-        if args.wsi_ext != '.tif':
+        if wsiID.split('.')[-1] != 'tif':
             slide=getWsi(wsiID)
             Im=np.array(slide.read_region((xStart,yStart),0,(region_size,region_size)))
             Im=Im[:,:,:3]

@@ -111,18 +111,26 @@ def IterateTraining(args):
             fileID=xmlID.split('/')[-1].split('.xml')[0]
 
             #create memory addresses for wsi files
-            wsiID=dirs['basedir'] + dirs['project']+  dirs['training_data_dir'] + str(currentAnnotationIteration) +'/'+ fileID + args.wsi_ext
+            for ext in args.wsi_ext:
+                wsiID=dirs['basedir'] + dirs['project']+  dirs['training_data_dir'] + str(currentAnnotationIteration) +'/'+ fileID + ext
+
+                #Ensure annotations exist
+                if os.path.isfile(wsiID)==True:
+                    break
 
             #Ensure annotations exist
             if os.path.isfile(wsiID)==False:
-                print('\nError - missing wsi file: ' + wsiID + '. Please provide.\n')
-
+                print('\nError - missing wsi file: ' + wsiID + ' Please provide.\n')
 
             #Load openslide information about WSI
-            slide=getWsi(wsiID)
+            if ext != '.tif':
+                slide=getWsi(wsiID)
+                #WSI level 0 dimensions (largest size)
+                dim_x,dim_y=slide.dimensions
+            else:
+                im = Image.open(wsiID)
+                dim_x, dim_y=im.size
 
-            #WSI level 0 dimensions (largest size)
-            dim_x,dim_y=slide.dimensions
 
             #Generate iterators for parallel chopping of WSIs in low resolution
             index_yLR=range(0,dim_y-stepLR,stepLR)
@@ -492,10 +500,16 @@ def return_region(args, xmlID, wsiID, fileID, yStart, xStart, idxy, idxx, downsa
 
     if chop_regions[idxy,idxx] != 0:
         uniqID=fileID + str(yStart) + str(xStart)
-
-        slide=getWsi(wsiID)
-        Im=np.array(slide.read_region((xStart,yStart),0,(region_size,region_size)))
-        Im=Im[:,:,:3]
+        if wsiID.split('.')[-1] != 'tif':
+            slide=getWsi(wsiID)
+            Im=np.array(slide.read_region((xStart,yStart),0,(region_size,region_size)))
+            Im=Im[:,:,:3]
+        else:
+            yEnd = yStart + region_size
+            xEnd = xStart + region_size
+            Im = np.zeros([region_size,region_size,3], dtype=np.uint8)
+            Im_ = imread(wsiID)[yStart:yEnd, xStart:xEnd, :3]
+            Im[0:Im_.shape[0], 0:Im_.shape[1], :] = Im_
 
         mask_annotation=xml_to_mask(xmlID,[xStart,yStart],[region_size,region_size],downsampleRate,0)
 

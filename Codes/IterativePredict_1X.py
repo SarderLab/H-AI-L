@@ -49,8 +49,9 @@ def validate(args):
         iteration = int(args.iteration)
 
     # get all WSIs
-    WSIs = glob(args.base_dir + '/' + args.project + dirs['validation_data_dir']
-    + '/*' + args.wsi_ext)
+    WSIs = []
+    for ext in args.wsi_ext:
+        WSIs.append(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + '/*' + ext))
 
     if iteration == 'none':
         print('ERROR: no trained models found \n\tplease use [--option train]')
@@ -121,8 +122,9 @@ def predict(args):
         make_folder(dirs['xml_save_dir'])
 
         # get all WSIs
-        WSIs = glob(args.base_dir + '/' + args.project + dirs['training_data_dir']
-            + str(iteration) + '/*' + args.wsi_ext)
+        WSIs = []
+        for ext in args.wsi_ext:
+            WSIs.append(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + '/*' + ext))
 
         for wsi in WSIs:
             try:
@@ -247,7 +249,7 @@ def chop_suey(wsi, dirs, downsample, region_size, step, args): # chop wsi
     print('\nopening: ' + wsi)
     basename = os.path.splitext(wsi)[0]
 
-    if args.wsi_ext != '.tif':
+    if wsi.split('.')[-1] != 'tif':
         slide=getWsi(wsi)
         # get image dimensions
         dim_x, dim_y=slide.dimensions
@@ -304,7 +306,7 @@ def chop_wsi(yStart, xStart, idxx, idxy, f_name, f2_name, dirs, downsample, regi
         xLen=xEnd-xStart
         yLen=yEnd-yStart
 
-        if args.wsi_ext != '.tif':
+        if wsi.split('.') != 'tif':
             slide = getWsi(wsi)
             subsect= np.array(slide.read_region((xStart,yStart),0,(xLen,yLen)))
             subsect=subsect[:,:,:3]

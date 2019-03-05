@@ -54,8 +54,10 @@ def validate(args):
         iteration = int(args.iteration)
 
     # get all WSIs
-    WSIs = glob(args.base_dir + '/' + args.project + dirs['validation_data_dir']
-    + '/*' + args.wsi_ext)
+    WSIs = []
+    for ext in args.wsi_ext:
+        WSIs.append(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + '/*' + ext))
+
     if iteration == 'none':
         print('ERROR: no trained models found \n\tplease use [--option train]')
 
@@ -123,8 +125,10 @@ def predict(args):
         make_folder(dirs['xml_save_dir'])
 
         # get all WSIs
-        WSIs = glob(args.base_dir + '/' + args.project + dirs['training_data_dir']
-            + str(iteration) + '/*' + args.wsi_ext)
+        WSIs = []
+        for ext in args.wsi_ext:
+            WSIs.append(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + '/*' + ext))
+            
         for wsi in WSIs:
             try:
                 predict_xml(args=args, dirs=dirs, wsi=wsi, iteration=iteration)
