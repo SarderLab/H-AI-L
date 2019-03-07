@@ -124,7 +124,7 @@ def predict(args):
         # get all WSIs
         WSIs = []
         for ext in args.wsi_ext:
-            WSIs.append(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + '/*' + ext))
+            WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration) + '/*' + ext))
 
         for wsi in WSIs:
             try:
