@@ -56,7 +56,7 @@ def validate(args):
     # get all WSIs
     WSIs = []
     for ext in args.wsi_ext:
-        WSIs.append(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + '/*' + ext))
+        WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + str(iteration)+ '/*' + ext))
 
     if iteration == 'none':
         print('ERROR: no trained models found \n\tplease use [--option train]')
@@ -127,15 +127,15 @@ def predict(args):
         # get all WSIs
         WSIs = []
         for ext in args.wsi_ext:
-            WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration) + '/*' + ext))
+            WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration)+ '/*' + ext))
 
         for wsi in WSIs:
-            try:
+            #try:
                 predict_xml(args=args, dirs=dirs, wsi=wsi, iteration=iteration)
-            except KeyboardInterrupt:
-                break
-            except:
-                print('!!! Prediction on ' + wsi + ' failed\nmoving on...')
+            #except KeyboardInterrupt:
+            #    break
+            #except:
+            #    print('!!! Prediction on ' + wsi + ' failed\nmoving on...')
         print('\n\n\033[92;5mPlease correct the xml annotations found in: \n\t' + dirs['xml_save_dir'])
         print('\nthen place them in: \n\t'+ args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration) + '/')
         print('\nand run [--option train]\033[0m\n')
