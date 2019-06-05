@@ -117,8 +117,8 @@ if __name__ == '__main__':
 
     ### Params for cutting wsi ###
     #White level cutoff
-    parser.add_argument('--whiteMax', dest='whiteMax', default=0.925 ,type=float,
-        help='white level chackpoint for chopping')
+    parser.add_argument('--white_percent', dest='white_percent', default=0.05 ,type=float,
+        help='white level checkpoint for chopping')
     #Low resolution parameters
     parser.add_argument('--overlap_percentLR', dest='overlap_percentLR', default=0.5 ,type=float,
         help='overlap percentage of low resolution blocks [0-1]')
@@ -177,7 +177,7 @@ if __name__ == '__main__':
         help='ext of saved image blocks')
     parser.add_argument('--finalImgExt', dest='finalImgExt', default='.jpeg' ,type=str,
         help='ext of final saved images')
-    parser.add_argument('--wsi_ext', dest='wsi_ext', default=['.svs'] , nargs='+', type=str,
+    parser.add_argument('--wsi_ext', dest='wsi_ext', default='.svs' ,type=str,
         help='file ext of wsi images')
     parser.add_argument('--bg_intensity', dest='bg_intensity', default=.5 ,type=float,
         help='if displaying output classifications [save_outputs = True] background color [0-1]')
@@ -186,7 +186,7 @@ if __name__ == '__main__':
 
 
     ### Params for optimizing wsi mask cleanup ###
-    parser.add_argument('--min_size', dest='min_size', default=15000 ,type=int,
+    parser.add_argument('--min_size', dest='min_size', default=650 ,type=int,
         help='min size region to be considered after prepass [in pixels]')
     parser.add_argument('--LR_region_pad', dest='LR_region_pad', default=50 ,type=int,
         help='padded region for low resolution region extraction')
