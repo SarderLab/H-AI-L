@@ -145,7 +145,7 @@ def IterateTraining(args):
             #Perform low resolution chopping in parallel and return the number of
             #images in each of the labeled classes
             chop_regions=get_choppable_regions(wsi=wsiID,
-                index_x=index_xLR,index_y=index_yLR,boxSize=region_sizeLR)
+                index_x=index_xLR,index_y=index_yLR,boxSize=region_sizeLR,white_percent=args.white_percent)
 
 
             classEnumCLR=Parallel(n_jobs=num_cores)(delayed(return_region)(args=args,
@@ -171,7 +171,7 @@ def IterateTraining(args):
             #Perform high resolution chopping in parallel and return the number of
             #images in each of the labeled classes
             chop_regions=get_choppable_regions(wsi=wsiID,
-                index_x=index_xHR,index_y=index_yHR,boxSize=region_sizeHR)
+                index_x=index_xHR,index_y=index_yHR,boxSize=region_sizeHR,white_percent=args.white_percent)
 
             classEnumCHR=Parallel(n_jobs=num_cores)(delayed(return_region)(args=args,
                 xmlID=xmlID, wsiID=wsiID, fileID=fileID, yStart=j, xStart=i,

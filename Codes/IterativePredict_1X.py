@@ -127,12 +127,12 @@ def predict(args):
             WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration) + '/*' + ext))
 
         for wsi in WSIs:
-            try:
-                predict_xml(args=args, dirs=dirs, wsi=wsi, iteration=iteration)
-            except KeyboardInterrupt:
-                break
-            except:
-                print('!!! Prediction on ' + wsi + ' failed\nmoving on...')
+            #try:
+            predict_xml(args=args, dirs=dirs, wsi=wsi, iteration=iteration)
+            #except KeyboardInterrupt:
+            #    break
+            #except:
+            #print('!!! Prediction on ' + wsi + ' failed\nmoving on...')
         print('\n\n\033[92;5mPlease correct the xml annotations found in: \n\t' + dirs['xml_save_dir'])
         print('\nthen place them in: \n\t'+ args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration) + '/')
         print('\nand run [--option train]\033[0m\n')
@@ -284,7 +284,7 @@ def chop_suey(wsi, dirs, downsample, region_size, step, args): # chop wsi
     f.close()
 
     # get non white regions
-    choppable_regions = get_choppable_regions(wsi=wsi, index_x=index_x, index_y=index_y, boxSize=region_size)
+    choppable_regions = get_choppable_regions(wsi=wsi, index_x=index_x, index_y=index_y, boxSize=region_size,white_percent=args.white_percent)
 
     print('saving region:')
 

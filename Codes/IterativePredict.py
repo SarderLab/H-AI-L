@@ -55,7 +55,7 @@ def validate(args):
 
     # get all WSIs
     WSIs = []
-    for ext in [args.wsi_ext]:
+    for ext in args.wsi_ext:
         WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + str(iteration)+ '/*' + ext))
 
     if iteration == 'none':
@@ -127,6 +127,7 @@ def predict(args):
         # get all WSIs
         WSIs = []
         for ext in [args.wsi_ext]:
+
             WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration)+ '/*' + ext))
 
         for wsi in WSIs:
@@ -238,7 +239,7 @@ def predict_xml(args, dirs, wsi, iteration):
 
     if args.approx_downsample!=1:
         print('\nDownsampling high resolution mask for prediction smoothing...')
-        wsiMask_HR=resize(wsiMask_HR,(d1,d2),order=0,anti_aliasing=False,preserve_range=True)
+        wsiMask_HR=resize(wsiMask_HR,(d1,d2),order=0,preserve_range=True)
     #mask_display=resize(wsiMask_HR,(d1,d2))
     #plt.imshow(mask_display/np.max(wsiMask))
     #plt.show()
@@ -331,7 +332,7 @@ def chop_suey(wsi, dirs, downsample, region_size, step, args): # chop wsi
     f.close()
 
     # get non white regions
-    choppable_regions = get_choppable_regions(wsi=wsi, index_x=index_x, index_y=index_y, boxSize=region_size)
+    choppable_regions = get_choppable_regions(wsi=wsi, index_x=index_x, index_y=index_y, boxSize=region_size,white_percent=args.white_percent)
 
     print('saving region:')
 
