@@ -104,7 +104,7 @@ def IterateTraining(args):
             fileID=xmlID.split('/')[-1].split('.xml')[0]
 
             #create memory addresses for wsi files
-            for ext in args.wsi_ext:
+            for ext in [args.wsi_ext]:
                 wsiID=dirs['basedir'] + dirs['project']+  dirs['training_data_dir'] + str(currentAnnotationIteration) +'/'+ fileID + ext
 
                 #Ensure annotations exist
