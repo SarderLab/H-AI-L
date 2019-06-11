@@ -262,7 +262,7 @@ def IterateTraining(args):
         'input_width': args.boxSizeLR,
         'modeldir': modeldir_LR,
         'num_classes': classNum,
-        'gpu': 1,
+        'gpu': args.gpu,
         'data_dir': dirs['data_dir_LR'],
         'print_color': "\033[3;37;40m",
         'log_file': modeldir_LR + 'log_'+ str(currentAnnotationIteration+1) +'_LR.txt',
