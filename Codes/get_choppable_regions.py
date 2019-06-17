@@ -30,6 +30,7 @@ def get_choppable_regions(wsi,index_x, index_y, boxSize,white_percent):
         binary2=binary_dilation(binary,selem=diamond(20))
         binary2=binary_fill_holes(binary2)
 
+        '''
         Im2=Im
         ax1=plt.subplot(121)
         ax1=plt.imshow(Im)
@@ -38,6 +39,7 @@ def get_choppable_regions(wsi,index_x, index_y, boxSize,white_percent):
         ax1=plt.imshow(Im2)
 
         plt.savefig(ID+'.png')
+        '''
 
         choppable_regions=np.zeros((len(index_y),len(index_x)))
         for idxy,yi in enumerate(index_y):
