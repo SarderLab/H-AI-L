@@ -216,8 +216,11 @@ def get_test_step(modeldir):
     maxmodel=0
     for modelfiles in pretrains:
         modelID=modelfiles.split('.')[-2].split('-')[1]
-        if int(modelID)>maxmodel:
-            maxmodel=int(modelID)
+        try:
+            modelID = int(modelID)
+            if modelID>maxmodel:
+                maxmodel=modelID
+        except: pass
     return maxmodel
 
 def make_folder(directory):
