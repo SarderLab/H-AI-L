@@ -55,9 +55,9 @@ def validate(args):
 
     # get all WSIs
     WSIs = []
-    for ext in args.wsi_ext:
-        WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + str(iteration)+ '/*' + ext))
-
+    for ext in [args.wsi_ext]:
+        WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + '/*' + ext))
+    
     if iteration == 'none':
         print('ERROR: no trained models found \n\tplease use [--option train]')
 
@@ -665,7 +665,8 @@ def crop_suey(wsiMask,label_offsets, dirs, args, classNum, downsample):
 def get_contour_points(mask, args, downsample, offset={'X': 0,'Y': 0}):
     # returns a dict pointList with point 'X' and 'Y' values
     # input greyscale binary image
-    _, maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
+    #_, maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
+    maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
 
     pointsList = []
     for j in range(np.shape(maskPoints)[0]):
