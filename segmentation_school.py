@@ -32,7 +32,7 @@ main code for training semantic segmentation of WSI iteratively
 def main(args):
 
     from InitializeFolderStructure import initFolder, purge_training_set, prune_training_set
-    if args.one_network == True:
+    if args.one_network == 'True' or args.one_network=='true' or args.one_network=='TRUE':
         from IterativeTraining_1X import IterateTraining
         from IterativePredict_1X import predict, validate
     else:
@@ -42,6 +42,7 @@ def main(args):
 
     # for teaching young segmentations networks
     starttime = time.time()
+
     if args.project == ' ':
         print('Please specify the project name: \n\t--project [folder]')
 
@@ -51,9 +52,13 @@ def main(args):
     elif args.option in ['train', 'Train']:
         IterateTraining(args=args)
         savetime(args=args, starttime=starttime)
+        assert(args.one_network!=' '),'You must specify --one_network True for dense prediction or --one_network False for sparse prediction'
+
     elif args.option in ['predict', 'Predict']:
         predict(args=args)
         savetime(args=args, starttime=starttime)
+        assert(args.one_network!=' '),'You must specify --one_network True for dense prediction or --one_network False for sparse prediction'
+
     elif args.option in ['validate', 'Validate']:
         validate(args=args)
     elif args.option in ['evolve', 'Evolve']:
@@ -65,7 +70,6 @@ def main(args):
 
     else:
         print('please specify an option in: \n\t--option [new, train, predict, validate]')
-
 
 def savetime(args, starttime):
     if args.option in ['new', 'New']:
@@ -91,8 +95,10 @@ if __name__ == '__main__':
         help='option for [new, train, predict, validate]')
     parser.add_argument('--transfer', dest='transfer', default=' ' ,type=str,
         help='name of project for transfer learning [pulls the newest model]')
-    parser.add_argument('--one_network', dest='one_network', default=False ,type=bool,
+    parser.add_argument('--one_network', dest='one_network', default=' ' ,type=str,
         help='use only high resolution network for training/prediction/validation')
+    parser.add_argument('--encoder_name', dest='encoder_name', default=' ' ,type=str,
+        help='encoder options are res50, res101, or deeplab')
 
     # automatically generated
     parser.add_argument('--base_dir', dest='base_dir', default=os.getcwd(),type=str,
@@ -118,6 +124,8 @@ if __name__ == '__main__':
     ### Params for cutting wsi ###
     #White level cutoff
     parser.add_argument('--white_percent', dest='white_percent', default=0.05 ,type=float,
+        help='white level checkpoint for chopping')
+    parser.add_argument('--max_block_dim', dest='max_block_dim', default=2000,type=int,
         help='white level checkpoint for chopping')
     #Low resolution parameters
     parser.add_argument('--overlap_percentLR', dest='overlap_percentLR', default=0.5 ,type=float,
