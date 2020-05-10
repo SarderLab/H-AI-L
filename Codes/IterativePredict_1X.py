@@ -202,11 +202,15 @@ def predict_xml(args, dirs, wsi, iteration):
 
     # save hotspots
     if dirs['save_outputs'] == True:
+    	#reduce the resolution of the image
+        wsidims=wsiMask.shape
+        wsiMask_save=resize(wsiMask,(int(wsidims[0]/4),int(wsidims[1]/4)),order=0,preserve_range=True)
+
         make_folder(dirs['outDir'] + fileID + dirs['mask_dir'])
         print('saving to: ' + dirs['outDir'] + fileID + dirs['mask_dir'] + fileID  + '.png')
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            imsave(dirs['outDir'] + fileID + dirs['mask_dir'] + fileID + '.png', wsiMask)
+            imsave(dirs['outDir'] + fileID + dirs['mask_dir'] + fileID + '.png', wsiMask_save)
 
     print('\n\nStarting XML construction: ')
 
