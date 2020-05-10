@@ -11,7 +11,9 @@ This script defines hyperparameters.
 
 
 
-def configure(test_data_list_, out_dir_, test_step_, test_num_steps_, modeldir_, data_dir_, num_steps_, save_interval_, learning_rate_, pretrain_file_, data_list_, batch_size_, input_height_, input_width_, num_classes_, print_color_, log_dir_, log_file_):
+def configure(test_data_list_, out_dir_, test_step_, test_num_steps_, modeldir_, data_dir_, num_steps_,
+	save_interval_, learning_rate_, pretrain_file_, data_list_, batch_size_, input_height_, input_width_,
+	num_classes_, print_color_, log_dir_, log_file_,encoder_name_):
 	flags = tf.app.flags
 
 	# training
@@ -22,7 +24,7 @@ def configure(test_data_list_, out_dir_, test_step_, test_num_steps_, modeldir_,
 	flags.DEFINE_float('learning_rate', learning_rate_, 'learning rate')
 	flags.DEFINE_float('power', 0.9, 'hyperparameter for poly learning rate')
 	flags.DEFINE_float('momentum', 0.9, 'momentum')
-	flags.DEFINE_string('encoder_name', 'deeplab', 'name of pre-trained model, res101, res50 or deeplab')
+	flags.DEFINE_string('encoder_name', encoder_name_, 'name of pre-trained model, res101, res50 or deeplab')
 	flags.DEFINE_string('pretrain_file', pretrain_file_, 'pre-trained model filename corresponding to encoder_name')
 	flags.DEFINE_string('data_list', data_list_, 'training data list filename')
 
@@ -72,7 +74,12 @@ def main(_):
 		# sess = tf.Session(config=config)
 		sess = tf.Session()
 		# Run
-		model = Model(sess, configure(test_data_list_=args.test_data_list, out_dir_=args.out_dir, test_step_=args.test_step, test_num_steps_=args.test_num_steps, modeldir_=args.modeldir, data_dir_=args.data_dir, num_steps_=args.num_steps, save_interval_=args.save_interval, learning_rate_=args.learning_rate, pretrain_file_=args.pretrain_file, data_list_=args.data_list, batch_size_=args.batch_size, input_height_=args.input_height, input_width_=args.input_width, num_classes_=args.num_classes, print_color_=args.print_color, log_dir_=args.log_dir, log_file_=args.log_file))
+		model = Model(sess, configure(test_data_list_=args.test_data_list, out_dir_=args.out_dir, test_step_=args.test_step,
+		test_num_steps_=args.test_num_steps, modeldir_=args.modeldir, data_dir_=args.data_dir,
+		num_steps_=args.num_steps, save_interval_=args.save_interval, learning_rate_=args.learning_rate,
+		pretrain_file_=args.pretrain_file, data_list_=args.data_list, batch_size_=args.batch_size,
+		input_height_=args.input_height, input_width_=args.input_width, num_classes_=args.num_classes,
+		print_color_=args.print_color, log_dir_=args.log_dir, log_file_=args.log_file, encoder_name_=args.encoder_name))
 		getattr(model, args.option)()
 
 
@@ -119,7 +126,8 @@ if __name__ == '__main__':
 		help='Default logfile name')
 	parser.add_argument('--print_color', dest='print_color', type=str, default="\033[0;37;40m",
 		help='color of printed text')
-
+	parser.add_argument('--encoder_name', dest='encoder_name', type=str, default=" ",
+		help='color of printed text')
 
 
 	args = parser.parse_args()
