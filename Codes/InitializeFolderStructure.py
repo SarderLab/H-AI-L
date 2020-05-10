@@ -47,12 +47,12 @@ def initFolder(args):
     dirs['pretraindir'] = '/Deeplab_network/'
     dirs['training_data_dir'] = '/TRAINING_data/'
     dirs['validation_data_dir'] = '/HOLDOUT_data/'
-    dirs['model_init'] = 'deeplab_resnet.ckpt'
     dirs['project']= '/' + args.project
     dirs['data_dir_HR'] = args.base_dir + args.project + '/Permanent/HR/'
     dirs['data_dir_LR'] = args.base_dir + args.project + '/Permanent/LR/'
     initializeFolderStructure(dirs,args)
     print('Please add xmls/svs files to the newest TRAINING_data folder.')
+    print('Please add model(s) to the MODELS/0/ folder.')
 
 
 def initializeFolderStructure(dirs,args):
@@ -60,8 +60,7 @@ def initializeFolderStructure(dirs,args):
     make_folder(dirs['basedir'] +dirs['project']+ dirs['modeldir'] + str(0) + '/HR/')
 
     if args.transfer==' ':
-        copyfile(dirs['basedir'] +'/Codes' + dirs['pretraindir']+ dirs['model_init'],dirs['basedir'] +dirs['project']+ dirs['modeldir'] + str(0) + '/LR/' + dirs['model_init'])
-        copyfile(dirs['basedir'] +'/Codes' + dirs['pretraindir']+ dirs['model_init'],dirs['basedir'] +dirs['project']+ dirs['modeldir'] + str(0) + '/HR/' + dirs['model_init'])
+        pass
     else:
 
         modelsCurrent=os.listdir(dirs['basedir'] + '/' + args.transfer + dirs['modeldir'])

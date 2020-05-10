@@ -155,10 +155,25 @@ def predict_xml(args, dirs, wsi, iteration):
         classNum = args.classNum
 
     # chop wsi
-    fileID, test_num_steps = chop_suey(wsi, dirs, downsample, region_size, step, args)
-    dirs['fileID'] = fileID
-    print('Chop SUEY!\n')
+    if args.chop_data == 'True':
+        # chop wsi
+        fileID, test_num_steps = chop_suey(wsi, dirs, downsample, region_size, step, args)
+        dirs['fileID'] = fileID
+        print('Chop SUEY!\n')
+    else:
+        basename = os.path.splitext(wsi)[0]
 
+        if wsi.split('.')[-1] != 'tif':
+            slide=getWsi(wsi)
+            # get image dimensions
+            dim_x, dim_y=slide.dimensions
+        else:
+            im = Image.open(wsi)
+            dim_x, dim_y=im.size
+
+        fileID=basename.split('/')
+        dirs['fileID'] = fileID=fileID[len(fileID)-1]
+        test_num_steps = file_len(dirs['outDir'] + fileID + dirs['txt_save_dir'] + fileID + '_images' + ".txt")
     # call DeepLab for prediction
     print('Segmenting tissue ...\n')
 
@@ -168,8 +183,8 @@ def predict_xml(args, dirs, wsi, iteration):
     modeldir = args.base_dir + '/' + args.project + dirs['modeldir'] + str(iteration) + '/HR'
     test_step = get_test_step(modeldir)
     print("\033[1;32;40m"+"starting prediction using model: \n\t" + modeldir + '/' + str(test_step) + "\033[0;37;40m"+"\n\n")
-
-    call(['python3', args.base_dir+'/Codes/Deeplab_network/main.py',
+    
+    call(['python3.5', args.base_dir+'/Codes/Deeplab_network/main.py',
         '--option', 'predict',
         '--test_data_list', dirs['outDir']+fileID+dirs['txt_save_dir']+test_data_list,
         '--out_dir', dirs['outDir']+fileID+dirs['img_save_dir'],
@@ -178,7 +193,8 @@ def predict_xml(args, dirs, wsi, iteration):
         '--modeldir', modeldir,
         '--data_dir', dirs['outDir']+fileID+dirs['img_save_dir'],
         '--num_classes', str(classNum),
-        '--gpu', str(args.gpu)])
+        '--gpu', str(args.gpu),
+        '--encoder_name',args.encoder_name])
 
     # un chop
     print('\nreconstructing wsi map ...\n')
@@ -204,15 +220,17 @@ def predict_xml(args, dirs, wsi, iteration):
 
 def get_iteration(args):
     currentmodels=os.listdir(args.base_dir + '/' + args.project + '/MODELS/')
+
     if not currentmodels:
         return 'none'
     else:
         currentmodels=map(int,currentmodels)
-        Iteration=np.max(currentmodels)
+        Iteration=np.max(list(currentmodels))
         return Iteration
 
 def get_test_step(modeldir):
     pretrains=glob(modeldir + '/*.ckpt*')
+
     maxmodel=0
     for modelfiles in pretrains:
         modelID=modelfiles.split('.')[-2].split('-')[1]
@@ -221,6 +239,7 @@ def get_test_step(modeldir):
             if modelID>maxmodel:
                 maxmodel=modelID
         except: pass
+
     return maxmodel
 
 def make_folder(directory):
@@ -277,8 +296,10 @@ def chop_suey(wsi, dirs, downsample, region_size, step, args): # chop wsi
     f.write('Image dimensions:\n')
 
     # make index for iters
-    index_y=range(0,dim_y-step,step)
-    index_x=range(0,dim_x-step,step)
+    index_y=np.array(range(0,dim_y,step))
+    index_x=np.array(range(0,dim_x,step))
+    index_y[-1]=dim_y-step
+    index_x[-1]=dim_x-step
 
     f.write('X dim: ' + str((index_x[-1]+region_size)/downsample) +'\n')
     f.write('Y dim: ' + str((index_y[-1]+region_size)/downsample) +'\n\n')
@@ -362,8 +383,8 @@ def un_suey(dirs, args): # reconstruct wsi from predicted masks
     lines = np.array(lines)
 
     # get wsi size
-    xDim = np.uint32((lines[1].split(': ')[1]).split('\n')[0])
-    yDim = np.uint32((lines[2].split(': ')[1]).split('\n')[0])
+    xDim =int(float((lines[1].split(': ')[1]).split('\n')[0]))
+    yDim = int(float((lines[2].split(': ')[1]).split('\n')[0]))
     #print('xDim: ' + str(xDim))
     #print('yDim: ' + str(yDim))
 
@@ -385,15 +406,15 @@ def un_suey(dirs, args): # reconstruct wsi from predicted masks
         mask = imread(dirs['outDir'] + dirs['fileID'] + dirs['img_save_dir'] + 'prediction/' + dirs['fileID'] + region[0] + '_mask.png')
 
         # get region bounds
-        xStart = np.uint32(region[1])
+        xStart = np.uint32(float(region[1]))
         #print('xStart: ' + str(xStart))
-        xStop = np.uint32(region[2])
+        xStop = np.uint32(float(region[2]))
         #print('xStop: ' + str(xStop))
-        yStart = np.uint32(region[3])
+        yStart = np.uint32(float(region[3]))
         if yStart < 0:
             yStart = 0
         #print('yStart: ' + str(yStart))
-        yStop = np.uint32(region[4])
+        yStop = np.uint32(float(region[4]))
         #print('yStop: ' + str(yStop))
 
         mask_part = wsiMask[yStart:yStop, xStart:xStop]
@@ -434,7 +455,7 @@ def xml_suey(wsiMask, dirs, args, classNum, downsample):
 def get_contour_points(mask, args, downsample, offset={'X': 0,'Y': 0}):
     # returns a dict pointList with point 'X' and 'Y' values
     # input greyscale binary image
-    _, maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
+    _,maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
     pointsList = []
 
     for j in range(np.shape(maskPoints)[0]):
@@ -479,7 +500,7 @@ def xml_add_region(Annotations, pointList, annotationID=-1, regionID=None): # ad
 def xml_save(Annotations, filename):
     xml_data = ET.tostring(Annotations, pretty_print=True)
     #xml_data = Annotations.toprettyxml()
-    f = open(filename, 'w')
+    f = open(filename, 'wb')
     f.write(xml_data)
     f.close()
 

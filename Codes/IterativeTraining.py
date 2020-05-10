@@ -130,12 +130,15 @@ def IterateTraining(args):
             else:
                 im = Image.open(wsiID)
                 dim_x, dim_y=im.size
-
+            wsi_mask=xml_to_mask(xmlID, [0,0], [dim_x,dim_y])
+            print('Loaded mask')
 
             #Generate iterators for parallel chopping of WSIs in low resolution
-            index_yLR=range(0,dim_y-stepLR,stepLR)
-            index_xLR=range(0,dim_x-stepLR,stepLR)
+            index_yLR=np.array(range(0,dim_y,stepLR))
+            index_xLR=np.array(range(0,dim_x,stepLR))
 
+            index_yLR[-1]=dim_y-stepLR
+            index_xLR[-1]=dim_x-stepLR
             #Create memory address for chopped images low resolution
             outdirLR=dirs['basedir'] + dirs['project'] + dirs['tempdirLR']
 
@@ -149,22 +152,25 @@ def IterateTraining(args):
 
 
             classEnumCLR=Parallel(n_jobs=num_cores)(delayed(return_region)(args=args,
-                xmlID=xmlID, wsiID=wsiID, fileID=fileID, yStart=j, xStart=i,
-                idxy=idxy, idxx=idxx, downsampleRate=args.downsampleRateLR,
-                outdirT=outdirLR, region_size=region_sizeLR, dirs=dirs,
-                chop_regions=chop_regions,cNum=classNum_LR) for idxx,i in enumerate(index_xLR) for idxy,j in enumerate(index_yLR))
+                wsi_mask=wsi_mask, wsiID=wsiID,
+                fileID=fileID, yStart=j, xStart=i, idxy=idxy,
+                idxx=idxx, downsampleRate=args.downsampleRateLR,
+                outdirT=outdirLR, region_size=region_sizeLR,
+                dirs=dirs, chop_regions=chop_regions,classNum=classNum_LR) for idxx,i in enumerate(index_xLR) for idxy,j in enumerate(index_yLR))
+            print('Time for low res WSI chopping: ' + str(time.time()-start))
 
             #Add number of images in each class to the global count low resolution
             CSLR=(sum(classEnumCLR))
             for c in range(0,CSLR.shape[0]):
                 classEnumLR[c]=classEnumLR[c]+CSLR[c]
-            #classEnumLR=[float(377),float(126)]
+
             #Print enumerations for each class
 
             #Generate iterators for parallel chopping of WSIs in high resolution
-            index_yHR=range(0,dim_y-stepHR,stepHR)
-            index_xHR=range(0,dim_x-stepHR,stepHR)
-
+            index_yHR=np.array(range(0,dim_y,stepHR))
+            index_xHR=np.array(range(0,dim_x,stepHR))
+            index_yHR[-1]=dim_y-stepHR
+            index_xHR[-1]=dim_x-stepHR
             #Create memory address for chopped images high resolution
             outdirHR=dirs['basedir'] + dirs['project'] + dirs['tempdirHR']
 
@@ -174,10 +180,12 @@ def IterateTraining(args):
                 index_x=index_xHR,index_y=index_yHR,boxSize=region_sizeHR,white_percent=args.white_percent)
 
             classEnumCHR=Parallel(n_jobs=num_cores)(delayed(return_region)(args=args,
-                xmlID=xmlID, wsiID=wsiID, fileID=fileID, yStart=j, xStart=i,
-                idxy=idxy, idxx=idxx, downsampleRate=args.downsampleRateHR,
-                outdirT=outdirHR, region_size=region_sizeHR, dirs=dirs,
-                chop_regions=chop_regions,cNum=classNum_HR) for idxx,i in enumerate(index_xHR) for idxy,j in enumerate(index_yHR))
+                wsi_mask=wsi_mask, wsiID=wsiID,
+                fileID=fileID, yStart=j, xStart=i, idxy=idxy,
+                idxx=idxx, downsampleRate=args.downsampleRateHR,
+                outdirT=outdirHR, region_size=region_sizeHR,
+                dirs=dirs, chop_regions=chop_regions,classNum=classNum_HR) for idxx,i in enumerate(index_xHR) for idxy,j in enumerate(index_yHR))
+            print('Time for high res WSI chopping: ' + str(time.time()-start))
 
             #Add number of images in each class to the global count high resolution
             CSHR=(sum(classEnumCHR))
@@ -191,12 +199,6 @@ def IterateTraining(args):
 
         ##Augment low resolution data
         #Location of augmentable data
-        imagesToAugmentLR=dirs['basedir']+dirs['project'] + dirs['tempdirLR'] + 'regions/'
-        masksToAugmentLR=dirs['basedir']+dirs['project'] + dirs['tempdirLR'] + 'masks/'
-        augmentList=glob(imagesToAugmentLR + '*.jpeg')
-
-        #Parallel iter
-        augIter=range(0,len(augmentList))
 
         #Output location for augmented data
         dirs['outDirAI']=dirs['basedir']+dirs['project'] + dirs['tempdirLR'] + '/Augment' + '/regions/'
@@ -204,31 +206,35 @@ def IterateTraining(args):
 
         #Enumerate low resolution class distributions for augmentation ratios
         classDistLR=np.zeros(len(classEnumLR))
-        ImageClassSplits=int((sum(classEnumLR)*args.aug_LR)/classNum_LR)
 
-        classAugs=np.zeros(classDistLR.shape)
         for idx,value in enumerate(classEnumLR):
             classDistLR[idx]=value/sum(classEnumLR)
-            classAugs[idx]=int(ImageClassSplits/value)
-        print('Low resolution augmentation distribution:')
-        print(classAugs)
+
         #Define number of augmentations per class
         if args.aug_LR > 0:
-            #classAugs=(np.round(args.aug_LR*(1-classDistLR))+1)
-            classAugs=classAugs.astype(int)
             augmentOrder=np.argsort(classDistLR)
+            classAugs=(np.round(args.aug_LR*(1-classDistLR))+1)
+            classAugs=classAugs.astype(int)
+            print('Low resolution augmentation distribution:')
+            print(classAugs)
+            imagesToAugmentLR=dirs['basedir']+dirs['project'] + dirs['tempdirLR'] + 'regions/'
+            masksToAugmentLR=dirs['basedir']+dirs['project'] + dirs['tempdirLR'] + 'masks/'
+            augmentList=glob(imagesToAugmentLR + '*.jpeg')
 
+            #Parallel iter
+            augIter=range(0,len(augmentList))
+
+            auglen=len(augmentList)
             #Augment images in parallel using inverted class distributions for augmentation iterations
             num_cores = multiprocessing.cpu_count()
             start=time.time()
 
             Parallel(n_jobs=num_cores)(delayed(run_batch)(augmentList,masksToAugmentLR,
                 batchidx,classAugs,args.boxSizeLR,args.hbound,args.lbound,
-                augmentOrder,dirs,classNum_LR) for batchidx in augIter)
+                augmentOrder,dirs,classNum_LR,auglen) for batchidx in augIter)
 
             moveimages(dirs['outDirAI'], dirs['basedir']+dirs['project'] + '/Permanent/LR/regions/')
             moveimages(dirs['outDirAM'], dirs['basedir']+dirs['project'] + '/Permanent/LR/masks/')
-            #augamt=len(glob(dirs['outDirAI'] + '*' +  dirs['imExt']))
 
         moveimages(dirs['basedir']+dirs['project'] + dirs['tempdirLR']+ '/regions/', dirs['basedir']+dirs['project'] + '/Permanent/LR/regions/')
         moveimages(dirs['basedir']+dirs['project'] + dirs['tempdirLR']+ '/masks/',dirs['basedir']+dirs['project'] + '/Permanent/LR/masks/')
@@ -236,23 +242,19 @@ def IterateTraining(args):
         print('Time for low resolution augmenting: ' + str((time.time()-totalStart)/60) + ' minutes.')
         ##High resolution augmentation
         #Enumerate high resolution class distribution
-        ImageClassSplits=int((sum(classEnumHR)*args.aug_HR)/classNum_HR)
-
-
 
         classDistHR=np.zeros(len(classEnumHR))
-        classAugs=np.zeros(classDistHR.shape)
         for idx,value in enumerate(classEnumHR):
             classDistHR[idx]=value/sum(classEnumHR)
-            classAugs[idx]=int(ImageClassSplits/value)
-        print('High resolution augmentation distribution:')
-        print(classAugs)
+
+
         #Define number of augmentations per class
         if args.aug_HR >0:
             augmentOrder=np.argsort(classDistHR)
-            #classAugs=(np.round(args.aug_HR*(1-classDistHR))+1)
+            classAugs=(np.round(args.aug_HR*(1-classDistHR))+1)
             classAugs=classAugs.astype(int)
-
+            print('High resolution augmentation distribution:')
+            print(classAugs)
             #High resolution input augmentable data
             imagesToAugmentHR=dirs['basedir']+dirs['project'] + dirs['tempdirHR'] + 'regions/'
             masksToAugmentHR=dirs['basedir']+dirs['project'] + dirs['tempdirHR'] + 'masks/'
@@ -260,6 +262,7 @@ def IterateTraining(args):
 
             #Parallel iterator
             augIter=range(0,len(augmentList))
+            auglen=len(augmentList)
 
             #Output for augmented data
             dirs['outDirAI']=dirs['basedir']+dirs['project'] + dirs['tempdirHR'] + '/Augment' + '/regions/'
@@ -270,7 +273,7 @@ def IterateTraining(args):
             start=time.time()
             Parallel(n_jobs=num_cores)(delayed(run_batch)(augmentList,masksToAugmentHR,
                 batchidx,classAugs,args.boxSizeHR,args.hbound,args.lbound,
-                augmentOrder,dirs,classNum_HR) for batchidx in augIter)
+                augmentOrder,dirs,classNum_HR,auglen) for batchidx in augIter)
             end=time.time()-start
             #augamt=len(glob(dirs['outDirAI'] + '*' +  dirs['imExt']))
 
@@ -285,11 +288,8 @@ def IterateTraining(args):
         #Total time
         print('Time for high resolution augmenting: ' + str((time.time()-totalStart)/60) + ' minutes.')
 
-
-
-
-    #Generate training and validation argumentshtop
-    training_args_list = [] # list of training argument directories low res and high res
+    #Generate training and validation arguments
+    training_args_list = []
     training_args_LR = []
     training_args_HR = []
 
@@ -304,7 +304,7 @@ def IterateTraining(args):
     generateDatalists(dirs['outDirAILR'],dirs['outDirAMLR'],'/regions/','/masks/',dirs['imExt'],dirs['maskExt'],trainOutLR)
     numImagesLR=len(glob(dirs['outDirAILR'] + '*' + dirs['imExt']))
 
-    numStepsLR=(args.epoch_LR*numImagesLR)/ args.CNNbatch_sizeLR
+    numStepsLR=int((args.epoch_LR*numImagesLR)/ args.CNNbatch_sizeLR)
     pretrain_LR=get_pretrain(currentAnnotationIteration,'/LR/',dirs)
     modeldir_LR =dirs['basedir']+dirs['project'] + dirs['modeldir'] + str(currentAnnotationIteration +1) + '/LR/'
 
@@ -332,6 +332,7 @@ def IterateTraining(args):
         'log_file': modeldir_LR + 'log_'+ str(currentAnnotationIteration+1) +'_LR.txt',
         'log_dir': modeldir_LR + 'log/',
         'learning_rate': args.learning_rate_LR,
+        'encoder_name':args.encoder_name
         }
     training_args_list.append(training_args_LR)
 
@@ -347,7 +348,7 @@ def IterateTraining(args):
     generateDatalists(dirs['outDirAIHR'],dirs['outDirAMHR'],'/regions/','/masks/',dirs['imExt'],dirs['maskExt'],trainOutHR)
     numImagesHR=len(glob(dirs['outDirAIHR'] + '*' + dirs['imExt']))
 
-    numStepsHR=(args.epoch_HR*numImagesHR)/ args.CNNbatch_sizeHR
+    numStepsHR=int((args.epoch_HR*numImagesHR)/ args.CNNbatch_sizeHR)
     # assign to dict
     training_args_HR={
         'numImages': numImagesHR,
@@ -366,6 +367,7 @@ def IterateTraining(args):
         'log_file': modeldir_HR + 'log_'+ str(currentAnnotationIteration+1) +'_HR.txt',
         'log_dir': modeldir_HR + 'log/',
         'learning_rate': args.learning_rate_HR,
+        'encoder_name': args.encoder_name
         }
     training_args_list.append(training_args_HR)
 
@@ -386,8 +388,8 @@ def IterateTraining(args):
 def moveimages(startfolder,endfolder):
     filelist=glob(startfolder + '*')
     for file in filelist:
-        fileID=file.split('/')[-1]
-        move(file,endfolder + fileID)
+        fileIDi=file.split('/')[-1]
+        move(file,endfolder + fileIDi)
 
 def train_net(training_args,dirs):
     '''
@@ -398,7 +400,7 @@ def train_net(training_args,dirs):
     print('Running [' + str( training_args['num_steps'] ), '] iterations')
     print('Saving every [' + str( training_args['save_interval'] ) + '] iterations')
 
-    call(['python3', dirs['basedir'] +'/Codes/Deeplab_network/main.py', '--option', 'train',
+    call(['python3.5', dirs['basedir'] +'/Codes/Deeplab_network/main.py', '--option', 'train',
         '--data_list', training_args['data_list'],
         '--num_steps', str(training_args['num_steps']),
         '--save_interval',str(training_args['save_interval']),
@@ -413,13 +415,14 @@ def train_net(training_args,dirs):
         '--log_dir', training_args['log_dir'],
         '--gpu', str(training_args['gpu']),
         '--learning_rate', str(training_args['learning_rate']),
-        '--print_color', training_args['print_color']])
+        '--print_color', training_args['print_color'],
+        '--encoder_name',training_args['encoder_name']])
 
 
 def check_model_generation(dirs):
     modelsCurrent=os.listdir(dirs['basedir'] + dirs['project'] + dirs['modeldir'])
     gens=map(int,modelsCurrent)
-    modelOrder=np.sort(gens)[::-1]
+    modelOrder=np.sort(list(gens))[::-1]
 
     for idx in modelOrder:
         modelsChkptsLR=glob(dirs['basedir'] + dirs['project'] + dirs['modeldir']+str(idx) + '/LR/*.ckpt*')
@@ -496,9 +499,13 @@ def make_all_folders(dirs):
     make_folder(dirs['basedir'] + '/Codes/Deeplab_network/datasetLR')
     make_folder(dirs['basedir'] + '/Codes/Deeplab_network/datasetHR')
 
-def return_region(args, xmlID, wsiID, fileID, yStart, xStart, idxy, idxx, downsampleRate, outdirT, region_size, dirs, chop_regions,cNum): # perform cutting in parallel
+def return_region(args, wsi_mask, wsiID, fileID, yStart, xStart, idxy, idxx, downsampleRate, outdirT, region_size, dirs, chop_regions,classNum): # perform cutting in parallel
+    sys.stdout.write('   <'+str(xStart)+'/'+ str(yStart)+ '>   ')
+    sys.stdout.flush()
+    restart_line()
 
     if chop_regions[idxy,idxx] != 0:
+
         uniqID=fileID + str(yStart) + str(xStart)
         if wsiID.split('.')[-1] != 'tif':
             slide=getWsi(wsiID)
@@ -511,29 +518,28 @@ def return_region(args, xmlID, wsiID, fileID, yStart, xStart, idxy, idxx, downsa
             Im_ = imread(wsiID)[yStart:yEnd, xStart:xEnd, :3]
             Im[0:Im_.shape[0], 0:Im_.shape[1], :] = Im_
 
-        mask_annotation=xml_to_mask(xmlID,[xStart,yStart],[region_size,region_size],downsampleRate,0)
+        mask_annotation=wsi_mask[yStart:yStart+region_size,xStart:xStart+region_size]
 
-        c=(Im.shape)
+        o1,o2=mask_annotation.shape
+        if o1 !=region_size:
+            mask_annotation=np.pad(mask_annotation,((0,region_size-o1),(0,0)),mode='constant')
+        if o2 !=region_size:
+            mask_annotation=np.pad(mask_annotation,((0,0),(0,region_size-o2)),mode='constant')
 
-        s1=int(c[0]/(downsampleRate**.5))
-        s2=int(c[1]/(downsampleRate**.5))
-        Im=resize(Im,(s1,s2),mode='reflect')
+        if downsampleRate !=1:
+            c=(Im.shape)
+            s1=int(c[0]/(downsampleRate**.5))
+            s2=int(c[1]/(downsampleRate**.5))
+            Im=(resize(Im,(s1,s2),mode='reflect')*255).astype('uint8')
+            mask_annotation=resize(mask_annotation,(s1,s2),order=0,preserve_range=True)
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             imsave(outdirT + '/regions/' + uniqID + dirs['imExt'],Im)
-            imsave(outdirT + '/masks/' + uniqID +dirs['maskExt'],mask_annotation)
-
-            '''
-            plt.subplot(121)
-            plt.imshow(Im)
-            plt.subplot(122)
-            plt.imshow(mask_annotation)
-            plt.show()
-            '''
-
+            imsave(outdirT + '/masks/' + uniqID +dirs['maskExt'],np.uint8(mask_annotation))
         classespresent=np.unique(mask_annotation)
-        classes=range(0,cNum)
-        classEnumC=np.zeros([cNum,1])
+        classes=range(0,classNum)
+        classEnumC=np.zeros([classNum,1])
 
         for index,chk in enumerate(classes):
             if chk in classespresent:
@@ -541,8 +547,9 @@ def return_region(args, xmlID, wsiID, fileID, yStart, xStart, idxy, idxx, downsa
         return classEnumC
     else:
 
-        classes=range(0,cNum)
-        classEnumC=np.zeros([cNum,1])
+
+        classes=range(0,classNum)
+        classEnumC=np.zeros([classNum,1])
         return classEnumC
 
 def load_batch(imageList,maskDir,batchindex,batch_augs,boxsize,dirs):
@@ -550,27 +557,30 @@ def load_batch(imageList,maskDir,batchindex,batch_augs,boxsize,dirs):
     X_data=[]
     mask_data=[]
     for b in range(0,batch_augs):
-        fileID = imageList[batchindex]
-        X_data.append(imread(fileID))
-        fileID=fileID.split('/')[-1].split('.')[0]
-        mask_data.append(imread(maskDir+fileID+dirs['maskExt']))
+        fileIDi = imageList[batchindex]
+        X_data.append(imread(fileIDi))
+        fileIDi=fileIDi.split('/')[-1].split('.')[0]
+        mask_data.append(imread(maskDir+fileIDi+dirs['maskExt']))
 
 
     return X_data,mask_data #Load N copies of current image based on class distributions
 
-def save_batch(imageblock,maskblock,imageList,batchindex,dirs,sub_iter):
+def save_batch(imageblock,maskblock,imageList,batchindex,dirs):
 
-    fileID = imageList[batchindex]
-    fileID=fileID.split('/')[-1].split('.')[0]
+    fileIDi = imageList[batchindex]
+    fileIDi=fileIDi.split('/')[-1].split('.')[0]
     for index in range(0,len(imageblock)):
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            imsave(dirs['outDirAI'] + fileID +'_'+str(sub_iter)+'_'+ str(index) + dirs['imExt'],imageblock[index])
-            imsave(dirs['outDirAM'] + fileID +'_'+str(sub_iter)+'_'+ str(index) + dirs['maskExt'],maskblock[index]) #Save N copies of current image
+            imsave(dirs['outDirAI'] + fileIDi +'_'+ str(index) + dirs['imExt'],np.uint8(imageblock[index]*255))
+            imsave(dirs['outDirAM'] + fileIDi +'_'+ str(index) + dirs['maskExt'],np.uint8(maskblock[index])) #Save N copies of current image
 
 def run_batch(imageList, maskDir, batchindex, class_augs, box_size,
-    hbound, lbound, augmentOrder,dirs,cNum):
+    hbound, lbound, augmentOrder,dirs,classNum,auglen):
+    sys.stdout.write('   <'+str(batchindex)+'/'+str(auglen)+ '>   ')
+    sys.stdout.flush()
+    restart_line()
     #Load image, determine augmentation probability, augment image, augment colorspace, save images
     global seq
     seq_det = seq.to_deterministic()
@@ -578,34 +588,20 @@ def run_batch(imageList, maskDir, batchindex, class_augs, box_size,
     imageblock,maskblock=load_batch(imageList,maskDir,batchindex,1,box_size,dirs)
 
     classespresent=np.unique(maskblock)
-    classes=range(0,cNum)
+    classes=range(0,classNum)
 
     for idx in augmentOrder:
         if idx in classespresent:
             prob=class_augs[idx]
             break
-
-    if prob>16:
-        augCounter=0
-        for augCounter in range(0,prob,16):
-            imageblock,maskblock=load_batch(imageList,maskDir,batchindex,16,box_size,dirs)
+    imageblock,maskblock=load_batch(imageList,maskDir,batchindex,prob,box_size,dirs)
 
 
-            imageblock=seq_det.augment_images(imageblock)
-            imageblock=colorshift(imageblock,hbound,lbound)
+    imageblock=seq_det.augment_images(imageblock)
+    imageblock=colorshift(imageblock,hbound,lbound)
 
-            maskblock=seq_det.augment_images(maskblock)
-            save_batch(imageblock,maskblock,imageList,batchindex,dirs,augCounter)
-
-    else:
-        imageblock,maskblock=load_batch(imageList,maskDir,batchindex,prob,box_size,dirs)
-
-
-        imageblock=seq_det.augment_images(imageblock)
-        imageblock=colorshift(imageblock,hbound,lbound)
-
-        maskblock=seq_det.augment_images(maskblock)
-        save_batch(imageblock,maskblock,imageList,batchindex,dirs,0)
+    maskblock=seq_det.augment_images(maskblock)
+    save_batch(imageblock,maskblock,imageList,batchindex,dirs)
 
 def colorshift(imageblock, hbound, lbound): #Shift Hue of HSV space and Lightness of LAB space
     for im in range(0,len(imageblock)):

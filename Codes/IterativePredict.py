@@ -24,10 +24,7 @@ from IterativeTraining import get_num_classes
 from get_choppable_regions import get_choppable_regions
 from get_network_performance import get_perf
 from matplotlib import pyplot as plt
-"""
-Pipeline code to find gloms from WSI
 
-"""
 
 # define xml class colormap
 xml_color = [65280, 65535, 255, 16711680, 33023]
@@ -57,7 +54,7 @@ def validate(args):
     WSIs = []
     for ext in [args.wsi_ext]:
         WSIs.extend(glob(args.base_dir + '/' + args.project + dirs['validation_data_dir'] + '/*' + ext))
-    
+
     if iteration == 'none':
         print('ERROR: no trained models found \n\tplease use [--option train]')
 
@@ -149,6 +146,7 @@ def predict_xml(args, dirs, wsi, iteration):
     region_size = int(args.boxSizeLR*(downsample))
     step = int(region_size*(1-args.overlap_percentLR))
 
+
     # figure out the number of classes
     if args.classNum == 0:
         annotatedXMLs=glob(args.base_dir + '/' + args.project + dirs['training_data_dir'] + str(iteration-1) + '/*.xml')
@@ -167,9 +165,25 @@ def predict_xml(args, dirs, wsi, iteration):
             classNum_HR = classNum_LR
 
     # chop wsi
-    fileID, test_num_steps, slide = chop_suey(wsi, dirs, downsample, region_size, step, args)
-    dirs['fileID'] = fileID
-    print('Chop SUEY!\n')
+    if args.chop_data == 'True':
+        # chop wsi
+        fileID, test_num_steps = chop_suey(wsi, dirs, downsample, region_size, step, args)
+        dirs['fileID'] = fileID
+        print('Chop SUEY!\n')
+    else:
+        basename = os.path.splitext(wsi)[0]
+
+        if wsi.split('.')[-1] != 'tif':
+            slide=getWsi(wsi)
+            # get image dimensions
+            dim_x, dim_y=slide.dimensions
+        else:
+            im = Image.open(wsi)
+            dim_x, dim_y=im.size
+
+        fileID=basename.split('/')
+        dirs['fileID'] = fileID=fileID[len(fileID)-1]
+        test_num_steps = file_len(dirs['outDir'] + fileID + dirs['txt_save_dir'] + fileID + '_images' + ".txt")
 
     # call DeepLab for prediction (Low resolution)
     print('finding Glom locations ...\n')
@@ -181,7 +195,7 @@ def predict_xml(args, dirs, wsi, iteration):
     test_step = get_test_step(modeldir)
     print("\033[1;32;40m"+"starting prediction using model: \n\t" + modeldir + str(test_step) + "\033[0;37;40m"+"\n\n")
 
-    call(['python3', args.base_dir+'/Codes/Deeplab_network/main.py',
+    call(['python3.5', args.base_dir+'/Codes/Deeplab_network/main.py',
         '--option', 'predict',
         '--test_data_list', dirs['outDir']+fileID+dirs['txt_save_dir']+test_data_list,
         '--out_dir', dirs['outDir']+fileID+dirs['img_save_dir'],
@@ -190,11 +204,13 @@ def predict_xml(args, dirs, wsi, iteration):
         '--modeldir', modeldir,
         '--data_dir', dirs['outDir']+fileID+dirs['img_save_dir'],
         '--num_classes', str(classNum_LR),
-        '--gpu', str(args.gpu)])
+        '--gpu', str(args.gpu),
+        '--encoder_name',args.encoder_name])
 
     # un chop
     print('\nreconstructing wsi map ...\n')
     wsiMask = un_suey(dirs=dirs, args=args)
+
 
     # save hotspots
     if dirs['save_outputs'] == True:
@@ -202,7 +218,7 @@ def predict_xml(args, dirs, wsi, iteration):
         print('saving to: ' + dirs['outDir'] + fileID + dirs['mask_dir'] + fileID  + '.png')
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            imsave(dirs['outDir'] + fileID + dirs['mask_dir'] + fileID + '.png', wsiMask/np.max(wsiMask))
+            imsave(dirs['outDir'] + fileID + dirs['mask_dir'] + fileID + '.png', wsiMask)
 
     # find glom locations in reconstructed map
     print('\ninterpreting prediction map ...')
@@ -218,7 +234,7 @@ def predict_xml(args, dirs, wsi, iteration):
     test_step = get_test_step(modeldir)
     print("\033[1;32;40m"+"starting prediction using model: \n\t" + modeldir + str(test_step) + "\033[0;37;40m"+"\n\n")
 
-    call(['python3', args.base_dir+'/Codes/Deeplab_network/main.py',
+    call(['python3.5', args.base_dir+'/Codes/Deeplab_network/main.py',
         '--option', 'predict',
         '--test_data_list', dirs['outDir']+fileID+dirs['txt_save_dir']+test_data_list,
         '--out_dir', dirs['outDir']+fileID+dirs['final_output_dir'],
@@ -227,9 +243,10 @@ def predict_xml(args, dirs, wsi, iteration):
         '--modeldir', modeldir,
         '--data_dir', dirs['outDir']+fileID+dirs['img_save_dir'],
         '--num_classes', str(classNum_HR),
-        '--gpu', str(args.gpu)])
+        '--gpu', str(args.gpu),
+        '--encoder_name',args.encoder_name])
 
-    print('\nsaving final glom images ...')
+    print('\nsaving final images ...')
     print('\nstitching high resolution WSI mask:')
 
     wsiMask_HR=unstitch_HR(dirs=dirs,args=args,wsi=wsi)
@@ -260,7 +277,7 @@ def get_iteration(args):
         return 'none'
     else:
         currentmodels=map(int,currentmodels)
-        Iteration=np.max(currentmodels)
+        Iteration=np.max(list(currentmodels))
         return Iteration
 
 def get_test_step(modeldir):
@@ -346,7 +363,7 @@ def chop_suey(wsi, dirs, downsample, region_size, step, args): # chop wsi
     test_num_steps = file_len(dirs['outDir'] + fileID + dirs['txt_save_dir'] + fileID + '_images' + ".txt")
     print('\n\n' + str(test_num_steps) +' image regions chopped')
 
-    return fileID, test_num_steps, slide
+    return fileID, test_num_steps
 
 def chop_wsi(yStart, xStart, idxx, idxy, f_name, f2_name, dirs, downsample, region_size, args, wsi, choppable_regions): # perform cutting in parallel
     if choppable_regions[idxy, idxx] != 0:
@@ -378,7 +395,7 @@ def chop_wsi(yStart, xStart, idxx, idxy, f_name, f2_name, dirs, downsample, regi
         s2=int(c[1]/(args.downsampleRateLR**.5))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            subsect=resize(subsect,(s1,s2), mode='constant')
+            subsect=(resize(subsect,(s1,s2), mode='constant')*255).astype('uint8')
 
         # save image
         directory = dirs['outDir'] + dirs['fileID'] + dirs['img_save_dir'] + dirs['chopped_dir']
@@ -449,8 +466,8 @@ def un_suey(dirs, args): # reconstruct wsi from predicted masks, low resolution
     lines = np.array(lines)
 
     # get wsi size
-    xDim = np.int32((lines[1].split(': ')[1]).split('\n')[0])
-    yDim = np.int32((lines[2].split(': ')[1]).split('\n')[0])
+    xDim = np.int32(float((lines[1].split(': ')[1]).split('\n')[0]))
+    yDim = np.int32(float((lines[2].split(': ')[1]).split('\n')[0]))
     #print('xDim: ' + str(xDim))
     #print('yDim: ' + str(yDim))
 
@@ -467,15 +484,15 @@ def un_suey(dirs, args): # reconstruct wsi from predicted masks, low resolution
         mask = imread(dirs['outDir'] + dirs['fileID'] + dirs['img_save_dir'] + 'prediction/' + dirs['fileID'] + region[0] + '_mask.png')
 
         # get region bounds
-        xStart = np.int32(region[1])
+        xStart = np.int32(float(region[1]))
         #print('xStart: ' + str(xStart))
-        xStop = np.int32(region[2])
+        xStop = np.int32(float(region[2]))
         #print('xStop: ' + str(xStop))
-        yStart = np.int32(region[3])
+        yStart = np.int32(float(region[3]))
         if yStart < 0:
             yStart = 0
         #print('yStart: ' + str(yStart))
-        yStop = np.int32(region[4])
+        yStop = np.int32(float(region[4]))
         #print('yStop: ' + str(yStop))
 
         # populate wsiMask with max
@@ -489,7 +506,7 @@ def find_suey(wsiMask, dirs, downsample, args, wsi): # locates the detected glom
     # clean up mask
     print('   removing small objects')
     cleanMask = remove_small_objects(wsiMask.astype(bool), (args.min_size)/(downsample*downsample))
-    print('   separating Glom objects\n')
+
     # find all unconnected regions
     labeledArray, num_features = label(cleanMask)
     print('found: '+ str(num_features-1) + '  regions')
@@ -533,15 +550,15 @@ def crop_region(region_iter, labeledArray, f_name, dirs, downsample, args, wsi,l
     region = region[:,:,0:3]
 
     dims=region.shape
-    max_block_dim=2000
+    max_block_dim=args.max_block_dim
     sub_box_size=args.boxSizeHR
     sub_region_iter=0
     if (xLen*yLen)>(max_block_dim*max_block_dim):
         stepHR = int(sub_box_size*(1-args.overlap_percentHR))
-        Idx1=range(xStart,xStart+xLen+sub_box_size,stepHR)-xStart
-        Idx2=range(yStart,yStart+yLen+sub_box_size,stepHR)-yStart
-        Idx1_o=range(xStart,xStart+xLen+sub_box_size,stepHR)
-        Idx2_o=range(yStart,yStart+yLen+sub_box_size,stepHR)
+        Idx1=np.array(range(xStart,xStart+xLen+sub_box_size,stepHR)-xStart)
+        Idx2=np.array(range(yStart,yStart+yLen+sub_box_size,stepHR)-yStart)
+        Idx1_o=np.array(range(xStart,xStart+xLen+sub_box_size,stepHR))
+        Idx2_o=np.array(range(yStart,yStart+yLen+sub_box_size,stepHR))
 
         Ovl1=xLen-Idx1[-2]
         Ovl2=yLen-Idx2[-2]
@@ -642,7 +659,6 @@ def crop_suey(wsiMask,label_offsets, dirs, args, classNum, downsample):
     for line in range(0, np.size(lines)):
         image_path = lines[line].split('\n')[0]
 
-        # get glom and corresponding mask
         file_name = (image_path.split('.')[0]).split(dirs['crop_dir'])[1]
         mask_image = imread(dirs['outDir'] + dirs['fileID'] + dirs['final_output_dir'] + 'prediction/'
             + file_name + '_mask.png')
@@ -666,7 +682,7 @@ def get_contour_points(mask, args, downsample, offset={'X': 0,'Y': 0}):
     # returns a dict pointList with point 'X' and 'Y' values
     # input greyscale binary image
     #_, maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
-    maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
+    _,maskPoints, contours = cv2.findContours(np.array(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
 
     pointsList = []
     for j in range(np.shape(maskPoints)[0]):
@@ -711,7 +727,7 @@ def xml_add_region(Annotations, pointList,args, annotationID=-1, regionID=None):
 def xml_save(Annotations, filename):
     xml_data = ET.tostring(Annotations, pretty_print=True)
     #xml_data = Annotations.toprettyxml()
-    f = open(filename, 'w')
+    f = open(filename, 'wb')
     f.write(xml_data)
     f.close()
 
