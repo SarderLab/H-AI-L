@@ -1,7 +1,7 @@
 ### H-AI-L (Human-A.I.-Loop) for semantic segmentation of WSI (whole slide images)
 
 A solution for machine learning for pathologists (easy semantic segmentation of WSI)
-This is a pipeline code for iterative training of the DeepLab v2 semantic segmentation network for adaption to WSI. 
+This is a library of codes for iterative training of the DeepLab v2 semantic segmentation network for WSIs. 
 Currently this code supports annotation and viewing of WSI boundaries using Aperio ImageScope 
 (https://www.leicabiosystems.com/digital-pathology/manage/aperio-imagescope/). 
 This is currently limited to files formats which have openslide-python support (.tif support is provided via PIL).
@@ -60,3 +60,15 @@ This code runs using python3, and was tested using ubuntu 16.04
 
     For non-sparse segmentation of WSI set the [--one_network] flag to 'True'
     this will use only the high resolution (HR) network for training and prediction
+
+### Quick start guide
+First, download the source codes and unzip them. Change the directory to the unzipped folder and run
+  python segmentation_school.py --option new --project project
+Where 'project' is the desired name of the directory to contain the new HAIL project.
+
+Next, place training WSIs and XML annotations OR prediction WSIs in the folder your_project_name/TRAINING_data/0/. Place your pre-trained model(s) into the your_project_name/MODELS/0/HR/ (for dense prediction) and/or your_project_name/MODELS/0/LR/ (for sparse prediction) folders.
+Then, run
+  python segmentation_school.py --option option --project project --encoder_name encoder_name --one_network one_network
+
+Where 'option' is either train or predict,'project' is the directory name you specified before, 'encoder_name' is either res50, res101, or deeplab, and 'one_network' is either true (dense prediction with one network) or false (sparse prediction with cascaded low-high resolution networks).
+Please open and refer to the segmentation_school.py script for a full list of possible input parameters and their default values. 
