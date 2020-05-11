@@ -63,14 +63,14 @@ This code runs using python3, and was tested using ubuntu 16.04
 
 ### Quick start guide
 First, download the source codes and unzip them. Change the directory to the unzipped folder and run
-```python
+```
 python segmentation_school.py --option new --project project
 ```
 Where 'project' is the desired name of the directory to contain the new HAIL project.
 
 Next, place training WSIs and XML annotations OR prediction WSIs in the folder your_project_name/TRAINING_data/0/. Place your pre-trained model(s) into the your_project_name/MODELS/0/HR/ (for dense prediction) and/or your_project_name/MODELS/0/LR/ (for sparse prediction) folders.
 Then, run
-```python
+```
 python segmentation_school.py --option option --project project --encoder_name encoder_name --one_network one_network
 ```
 Where 'option' is either train or predict,'project' is the directory name you specified before, 'encoder_name' is either res50, res101, or deeplab, and 'one_network' is either true (dense prediction with one network) or false (sparse prediction with cascaded low-high resolution networks).
