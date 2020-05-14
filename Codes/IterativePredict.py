@@ -531,7 +531,7 @@ def find_suey(wsiMask, dirs, downsample, args, wsi): # locates the detected glom
     #num_cores = multiprocessing.cpu_count()
     #Parallel(n_jobs=num_cores)(delayed(crop_region)(region_iter=i, labeledArray=labeledArray, fileID=fileID, f_name=f_name) for i in range(1, num_features))
     label_offsets = []
-    for region_iter in range(1, num_features):
+    for region_iter in range(1, num_features+1):
         label_offsets = crop_region(region_iter=region_iter, labeledArray=labeledArray, f_name=f_name, dirs=dirs, downsample=downsample, args=args, wsi=wsi,label_offsets=label_offsets)
         #label_offsets.append(label_offset[:])
 
