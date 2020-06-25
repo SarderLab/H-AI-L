@@ -3,18 +3,6 @@ import sys
 import lxml.etree as ET
 import cv2
 
-def get_num_classes(xml_path):
-    # parse xml and get root
-    tree = ET.parse(xml_path)
-    root = tree.getroot()
-
-    annotation_num = 0
-    for Annotation in root.findall("./Annotation"): # for all annotations
-        annotation_num = annotation_num + 1
-
-    return annotation_num + 1
-
-
 """
 location (tuple) - (x, y) tuple giving the top left pixel in the level 0 reference frame
 size (tuple) - (width, height) tuple giving the region size
@@ -29,26 +17,30 @@ def xml_to_mask(xml_path, location, size, downsample_factor=1, verbose=0):
     # calculate region bounds
     bounds = {'x_min' : location[0], 'y_min' : location[1], 'x_max' : location[0] + size[0], 'y_max' : location[1] + size[1]}
 
-    IDs = regions_in_mask(root=root, bounds=bounds, verbose=verbose)
+    IDs = regions_in_mask(xml_path=xml_path, root=root, bounds=bounds, verbose=verbose)
 
-    if verbose != 0:
-        print('\nFOUND: ' + str(len(IDs)) + ' regions')
+    # recursive rerun
+    if IDs == 'rerun':
+        mask = xml_to_mask(xml_path, location, size, downsample_factor=downsample_factor, verbose=verbose)
+        return mask
 
-    # find regions in bounds
-    Regions = get_vertex_points(root=root, IDs=IDs, verbose=verbose)
+    # carry on my wayward son
+    else:
+        if verbose != 0:
+            print('\nFOUND: ' + str(len(IDs)) + ' regions')
 
-    # fill regions and create mask
-    mask = Regions_to_mask(Regions=Regions, bounds=bounds, IDs=IDs, downsample_factor=downsample_factor, verbose=verbose)
-    if verbose != 0:
-        print('done...\n')
+        # find regions in bounds
+        Regions = get_vertex_points(root=root, IDs=IDs, verbose=verbose)
 
-    return mask
+        # fill regions and create mask
+        mask = Regions_to_mask(Regions=Regions, bounds=bounds, IDs=IDs, downsample_factor=downsample_factor, verbose=verbose)
+        if verbose != 0:
+            print('done...\n')
 
-def restart_line(): # for printing labels in command line
-    sys.stdout.write('\r')
-    sys.stdout.flush()
+        return mask
 
-def regions_in_mask(root, bounds, verbose=1):
+
+def regions_in_mask(xml_path, root, bounds, verbose=1):
     # find regions to save
     IDs = []
 
@@ -57,17 +49,22 @@ def regions_in_mask(root, bounds, verbose=1):
 
         for Region in Annotation.findall("./*/Region"): # iterate on all region
 
-            if verbose != 0:
-                sys.stdout.write('TESTING: ' + 'Annotation: ' + annotationID + '\tRegion: ' + Region.attrib['Id'])
-                sys.stdout.flush()
-                restart_line()
+            for Vert in Region.findall("./Vertices"): # iterate on all vertex in region
 
-            for Vertex in Region.findall("./*/Vertex"): # iterate on all vertex in region
-                # get points
-                x_point = np.int32(np.float64(Vertex.attrib['X']))
-                y_point = np.int32(np.float64(Vertex.attrib['Y']))
-                # test if points are in bounds
-                if bounds['x_min'] <= x_point <= bounds['x_max'] and bounds['y_min'] <= y_point <= bounds['y_max']: # test points in region bounds
+                try:
+                    # get minmax points
+                    Xmin = np.int32(Vert.attrib['Xmin'])
+                    Ymin = np.int32(Vert.attrib['Ymin'])
+                    Xmax = np.int32(Vert.attrib['Xmax'])
+                    Ymax = np.int32(Vert.attrib['Ymax'])
+
+                except:
+                    # minmax does not exist recursive loop to xml_to_mask
+                    write_minmax_to_xml(xml_path)
+                    return 'rerun'
+
+                # test minmax points in region bounds
+                if bounds['x_min'] <= Xmax and bounds['x_max'] >= Xmin and bounds['y_min'] <= Ymax and bounds['y_max'] >= Ymin:
                     # save region Id
                     IDs.append({'regionID' : Region.attrib['Id'], 'annotationID' : annotationID})
                     break
@@ -77,10 +74,6 @@ def get_vertex_points(root, IDs, verbose=1):
     Regions = []
 
     for ID in IDs: # for all IDs
-        if verbose != 0:
-            sys.stdout.write('PARSING: ' + 'Annotation: ' + ID['annotationID'] + '\tRegion: ' + ID['regionID'])
-            sys.stdout.flush()
-            restart_line()
 
         # get all vertex attributes (points)
         Vertices = []
@@ -88,7 +81,6 @@ def get_vertex_points(root, IDs, verbose=1):
         for Vertex in root.findall("./Annotation[@Id='" + ID['annotationID'] + "']/Regions/Region[@Id='" + ID['regionID'] + "']/Vertices/Vertex"):
             # make array of points
             Vertices.append([int(float(Vertex.attrib['X'])), int(float(Vertex.attrib['Y']))])
-
 
         Regions.append(np.array(Vertices))
 
@@ -112,8 +104,6 @@ def Regions_to_mask(Regions, bounds, IDs, downsample_factor, verbose=1):
         min_size = np.amin(min_sizes, axis=1)
         max_size = np.amax(max_sizes, axis=1)
 
-
-
         # add to old bounds
         bounds['x_min_pad'] = min(min_size[1], bounds['x_min'])
         bounds['y_min_pad'] = min(min_size[0], bounds['y_min'])
@@ -121,8 +111,7 @@ def Regions_to_mask(Regions, bounds, IDs, downsample_factor, verbose=1):
         bounds['y_max_pad'] = max(max_size[0], bounds['y_max'])
 
         # make blank mask
-        mask = np.zeros([ int(np.round((bounds['y_max_pad'] - bounds['y_min_pad']) / downsample)), int(np.round((bounds['x_max_pad'] - bounds['x_min_pad']) / downsample)) ], dtype=np.int8)
-
+        mask = np.zeros([ int(np.round((bounds['y_max_pad'] - bounds['y_min_pad']) / downsample)), int(np.round((bounds['x_max_pad'] - bounds['x_min_pad']) / downsample)) ], dtype=np.uint8)
 
         # fill mask polygons
         index = 0
@@ -147,3 +136,50 @@ def Regions_to_mask(Regions, bounds, IDs, downsample_factor, verbose=1):
         mask = np.zeros([ int(np.round((bounds['y_max'] - bounds['y_min']) / downsample)), int(np.round((bounds['x_max'] - bounds['x_min']) / downsample)) ])
 
     return mask
+
+def write_minmax_to_xml(filename):
+    # function to write min and max verticies to each region
+    # parse xml and get root
+    tree = ET.parse(filename)
+    root = tree.getroot()
+
+    for Annotation in root.findall("./Annotation"): # for all annotations
+        annotationID = Annotation.attrib['Id']
+
+        for Region in Annotation.findall("./*/Region"): # iterate on all region
+
+            for Vert in Region.findall("./Vertices"): # iterate on all vertex in region
+                Xs = []
+                Ys = []
+                for Vertex in Vert.findall("./Vertex"): # iterate on all vertex in region
+                    # get points
+                    Xs.append(np.int32(np.float64(Vertex.attrib['X'])))
+                    Ys.append(np.int32(np.float64(Vertex.attrib['Y'])))
+
+                # find min and max points
+                Xs = np.array(Xs)
+                Ys = np.array(Ys)
+
+                # modify the xml
+                Vert.set("Xmin", "{}".format(np.min(Xs)))
+                Vert.set("Xmax", "{}".format(np.max(Xs)))
+                Vert.set("Ymin", "{}".format(np.min(Ys)))
+                Vert.set("Ymax", "{}".format(np.max(Ys)))
+
+    xml_data = ET.tostring(tree, pretty_print=True)
+    #xml_data = Annotations.toprettyxml()
+    f = open(filename, 'w')
+    f.write(xml_data.decode())
+    f.close()
+
+
+def get_num_classes(xml_path):
+    # parse xml and get root
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    annotation_num = 0
+    for Annotation in root.findall("./Annotation"): # for all annotations
+        annotation_num = annotation_num + 1
+
+    return annotation_num + 1
