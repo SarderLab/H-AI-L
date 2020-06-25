@@ -2,6 +2,8 @@ import numpy as np
 import sys
 import lxml.etree as ET
 import cv2
+import time
+import os
 
 """
 location (tuple) - (x, y) tuple giving the top left pixel in the level 0 reference frame
@@ -10,6 +12,11 @@ size (tuple) - (width, height) tuple giving the region size
 """
 
 def xml_to_mask(xml_path, location, size, downsample_factor=1, verbose=0):
+    # buffer on file modification time (sec)
+    # used to check if the file has been modified
+    # used to know id minmax need to be recalculated
+    time_buffer = 10
+
     # parse xml and get root
     tree = ET.parse(xml_path)
     root = tree.getroot()
@@ -17,7 +24,7 @@ def xml_to_mask(xml_path, location, size, downsample_factor=1, verbose=0):
     # calculate region bounds
     bounds = {'x_min' : location[0], 'y_min' : location[1], 'x_max' : location[0] + size[0], 'y_max' : location[1] + size[1]}
 
-    IDs = regions_in_mask(xml_path=xml_path, root=root, bounds=bounds, verbose=verbose)
+    IDs = regions_in_mask(xml_path=xml_path, root=root, bounds=bounds, verbose=verbose, time_buffer=time_buffer)
 
     # recursive rerun
     if IDs == 'rerun':
@@ -40,9 +47,22 @@ def xml_to_mask(xml_path, location, size, downsample_factor=1, verbose=0):
         return mask
 
 
-def regions_in_mask(xml_path, root, bounds, verbose=1):
+def regions_in_mask(xml_path, root, bounds, verbose=1, time_buffer=10):
     # find regions to save
     IDs = []
+    mtime = os.path.getmtime(xml_path)
+
+    try:
+        # has the xml been modified to include minmax
+        modtime = np.float64(root.attrib['modtime'])
+        # has the minmax modified xml been changed?
+        assert os.path.getmtime(xml_path) < modtime + time_buffer
+
+
+    except:
+        # minmax does not exist recursive loop to xml_to_mask
+        write_minmax_to_xml(xml_path)
+        return 'rerun'
 
     for Annotation in root.findall("./Annotation"): # for all annotations
         annotationID = Annotation.attrib['Id']
@@ -51,17 +71,11 @@ def regions_in_mask(xml_path, root, bounds, verbose=1):
 
             for Vert in Region.findall("./Vertices"): # iterate on all vertex in region
 
-                try:
-                    # get minmax points
-                    Xmin = np.int32(Vert.attrib['Xmin'])
-                    Ymin = np.int32(Vert.attrib['Ymin'])
-                    Xmax = np.int32(Vert.attrib['Xmax'])
-                    Ymax = np.int32(Vert.attrib['Ymax'])
-
-                except:
-                    # minmax does not exist recursive loop to xml_to_mask
-                    write_minmax_to_xml(xml_path)
-                    return 'rerun'
+                # get minmax points
+                Xmin = np.int32(Vert.attrib['Xmin'])
+                Ymin = np.int32(Vert.attrib['Ymin'])
+                Xmax = np.int32(Vert.attrib['Xmax'])
+                Ymax = np.int32(Vert.attrib['Ymax'])
 
                 # test minmax points in region bounds
                 if bounds['x_min'] <= Xmax and bounds['x_max'] >= Xmin and bounds['y_min'] <= Ymax and bounds['y_max'] >= Ymin:
@@ -166,6 +180,7 @@ def write_minmax_to_xml(filename):
                 Vert.set("Ymin", "{}".format(np.min(Ys)))
                 Vert.set("Ymax", "{}".format(np.max(Ys)))
 
+    root.set("modtime", "{}".format(time.time()))
     xml_data = ET.tostring(tree, pretty_print=True)
     #xml_data = Annotations.toprettyxml()
     f = open(filename, 'w')
