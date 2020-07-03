@@ -12,10 +12,6 @@ size (tuple) - (width, height) tuple giving the region size
 """
 
 def xml_to_mask(xml_path, location, size, downsample_factor=1, verbose=0):
-    # buffer on file modification time (sec)
-    # used to check if the file has been modified
-    # used to know id minmax need to be recalculated
-    time_buffer = 10
 
     # parse xml and get root
     tree = ET.parse(xml_path)
@@ -24,45 +20,28 @@ def xml_to_mask(xml_path, location, size, downsample_factor=1, verbose=0):
     # calculate region bounds
     bounds = {'x_min' : location[0], 'y_min' : location[1], 'x_max' : location[0] + size[0], 'y_max' : location[1] + size[1]}
 
-    IDs = regions_in_mask(xml_path=xml_path, root=root, bounds=bounds, verbose=verbose, time_buffer=time_buffer)
+    IDs = regions_in_mask(xml_path=xml_path, root=root, bounds=bounds, verbose=verbose)
 
-    # recursive rerun
-    if IDs == 'rerun':
-        mask = xml_to_mask(xml_path, location, size, downsample_factor=downsample_factor, verbose=verbose)
-        return mask
+    if verbose != 0:
+        print('\nFOUND: ' + str(len(IDs)) + ' regions')
 
-    # carry on my wayward son
-    else:
-        if verbose != 0:
-            print('\nFOUND: ' + str(len(IDs)) + ' regions')
+    # find regions in bounds
+    Regions = get_vertex_points(root=root, IDs=IDs, verbose=verbose)
 
-        # find regions in bounds
-        Regions = get_vertex_points(root=root, IDs=IDs, verbose=verbose)
+    # fill regions and create mask
+    mask = Regions_to_mask(Regions=Regions, bounds=bounds, IDs=IDs, downsample_factor=downsample_factor, verbose=verbose)
+    if verbose != 0:
+        print('done...\n')
 
-        # fill regions and create mask
-        mask = Regions_to_mask(Regions=Regions, bounds=bounds, IDs=IDs, downsample_factor=downsample_factor, verbose=verbose)
-        if verbose != 0:
-            print('done...\n')
-
-        return mask
+    return mask
 
 
-def regions_in_mask(xml_path, root, bounds, verbose=1, time_buffer=10):
+def regions_in_mask(xml_path, root, bounds, verbose=1):
     # find regions to save
     IDs = []
     mtime = os.path.getmtime(xml_path)
 
-    try:
-        # has the xml been modified to include minmax
-        modtime = np.float64(root.attrib['modtime'])
-        # has the minmax modified xml been changed?
-        assert os.path.getmtime(xml_path) < modtime + time_buffer
-
-
-    except:
-        # minmax does not exist recursive loop to xml_to_mask
-        write_minmax_to_xml(xml_path)
-        return 'rerun'
+    write_minmax_to_xml(xml_path, tree)
 
     for Annotation in root.findall("./Annotation"): # for all annotations
         annotationID = Annotation.attrib['Id']
@@ -151,41 +130,49 @@ def Regions_to_mask(Regions, bounds, IDs, downsample_factor, verbose=1):
 
     return mask
 
-def write_minmax_to_xml(filename):
+def write_minmax_to_xml(xml_path, tree, time_buffer=10):
     # function to write min and max verticies to each region
     # parse xml and get root
-    tree = ET.parse(filename)
+
     root = tree.getroot()
 
-    for Annotation in root.findall("./Annotation"): # for all annotations
-        annotationID = Annotation.attrib['Id']
+    try:
+        # has the xml been modified to include minmax
+        modtime = np.float64(root.attrib['modtime'])
+        # has the minmax modified xml been changed?
+        assert os.path.getmtime(xml_path) < modtime + time_buffer
 
-        for Region in Annotation.findall("./*/Region"): # iterate on all region
+    except:
 
-            for Vert in Region.findall("./Vertices"): # iterate on all vertex in region
-                Xs = []
-                Ys = []
-                for Vertex in Vert.findall("./Vertex"): # iterate on all vertex in region
-                    # get points
-                    Xs.append(np.int32(np.float64(Vertex.attrib['X'])))
-                    Ys.append(np.int32(np.float64(Vertex.attrib['Y'])))
+        for Annotation in root.findall("./Annotation"): # for all annotations
+            annotationID = Annotation.attrib['Id']
 
-                # find min and max points
-                Xs = np.array(Xs)
-                Ys = np.array(Ys)
+            for Region in Annotation.findall("./*/Region"): # iterate on all region
 
-                # modify the xml
-                Vert.set("Xmin", "{}".format(np.min(Xs)))
-                Vert.set("Xmax", "{}".format(np.max(Xs)))
-                Vert.set("Ymin", "{}".format(np.min(Ys)))
-                Vert.set("Ymax", "{}".format(np.max(Ys)))
+                for Vert in Region.findall("./Vertices"): # iterate on all vertex in region
+                    Xs = []
+                    Ys = []
+                    for Vertex in Vert.findall("./Vertex"): # iterate on all vertex in region
+                        # get points
+                        Xs.append(np.int32(np.float64(Vertex.attrib['X'])))
+                        Ys.append(np.int32(np.float64(Vertex.attrib['Y'])))
 
-    root.set("modtime", "{}".format(time.time()))
-    xml_data = ET.tostring(tree, pretty_print=True)
-    #xml_data = Annotations.toprettyxml()
-    f = open(filename, 'w')
-    f.write(xml_data.decode())
-    f.close()
+                    # find min and max points
+                    Xs = np.array(Xs)
+                    Ys = np.array(Ys)
+
+                    # modify the xml
+                    Vert.set("Xmin", "{}".format(np.min(Xs)))
+                    Vert.set("Xmax", "{}".format(np.max(Xs)))
+                    Vert.set("Ymin", "{}".format(np.min(Ys)))
+                    Vert.set("Ymax", "{}".format(np.max(Ys)))
+
+        root.set("modtime", "{}".format(time.time()))
+        xml_data = ET.tostring(tree, pretty_print=True)
+        #xml_data = Annotations.toprettyxml()
+        f = open(xml_path, 'w')
+        f.write(xml_data.decode())
+        f.close()
 
 
 def get_num_classes(xml_path):
@@ -195,6 +182,6 @@ def get_num_classes(xml_path):
 
     annotation_num = 0
     for Annotation in root.findall("./Annotation"): # for all annotations
-        annotation_num = annotation_num + 1
+        annotation_num += 1
 
     return annotation_num + 1
